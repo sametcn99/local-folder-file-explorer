@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="black">
+<html lang="en" data-theme="halloween">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -248,6 +248,15 @@
             </button>
           </div>
 
+          <!-- Scan progress -->
+          <div id="scan-progress" class="hidden flex-col gap-1">
+            <div class="flex items-center justify-between text-[10px] font-mono text-base-content/50">
+              <span id="scan-progress-label">Scanning…</span>
+              <span id="scan-progress-pct">0%</span>
+            </div>
+            <progress id="scan-progress-bar" class="progress progress-primary w-full h-1.5" value="0" max="100"></progress>
+          </div>
+
           <!-- Search + controls -->
           <div id="sidebar-controls" class="hidden flex-col gap-2">
             <label class="input input-sm input-bordered bg-base-100 flex items-center gap-2 h-8">
@@ -308,6 +317,73 @@
                 </svg>
                 Collapse
               </button>
+            </div>
+
+            <!-- Sort + Filter -->
+            <div class="flex items-center gap-1">
+              <select id="sort-key" class="select select-xs select-bordered bg-base-100 flex-1 text-[10px]" title="Sort by">
+                <option value="name">Name</option>
+                <option value="type">Type</option>
+                <option value="size">Size</option>
+                <option value="modified">Modified</option>
+              </select>
+              <button id="btn-sort-dir" class="btn btn-xs btn-ghost btn-square" title="Toggle sort direction">
+                <svg
+                  id="sort-dir-icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                  class="w-3.5 h-3.5"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h9M3 9h6m-6 4.5h9m5-9v14.25m0 0-3.75-3.75M17.25 19.5 21 15.75" />
+                </svg>
+              </button>
+              <div class="dropdown dropdown-end flex-1">
+                <button id="btn-filter" tabindex="0" class="btn btn-xs btn-ghost w-full gap-1 text-[10px]" title="Filter by type / size">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    class="w-3 h-3 shrink-0"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"
+                    />
+                  </svg>
+                  <span id="filter-label" class="truncate">Filter</span>
+                  <span id="filter-badge" class="badge badge-primary badge-xs hidden"></span>
+                </button>
+                <div
+                  tabindex="0"
+                  class="dropdown-content z-30 mt-1 p-2 shadow-xl bg-base-300 border border-base-content/10 rounded-box w-56 max-h-72 overflow-y-auto flex flex-col gap-2"
+                >
+                  <div>
+                    <div class="text-[10px] font-semibold text-base-content/50 mb-1 flex items-center justify-between">
+                      <span>Size</span>
+                    </div>
+                    <select id="filter-size" class="select select-xs select-bordered bg-base-100 w-full text-[10px]">
+                      <option value="all">Any size</option>
+                      <option value="lt100kb">&lt; 100 KB</option>
+                      <option value="100kb-1mb">100 KB – 1 MB</option>
+                      <option value="1mb-10mb">1 MB – 10 MB</option>
+                      <option value="gt10mb">&gt; 10 MB</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="text-[10px] font-semibold text-base-content/50 mb-1 flex items-center justify-between">
+                      <span>Type</span>
+                      <button id="filter-type-clear" class="link link-hover text-[10px] text-base-content/40">clear</button>
+                    </div>
+                    <div id="filter-type-list" class="flex flex-col gap-0.5"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -463,6 +539,18 @@
       const btnViewPreview = document.getElementById("btn-view-preview")
       const btnViewCode = document.getElementById("btn-view-code")
       const codeEditorEl = document.getElementById("code-editor")
+      const sortKeySelect = document.getElementById("sort-key")
+      const btnSortDir = document.getElementById("btn-sort-dir")
+      const sortDirIcon = document.getElementById("sort-dir-icon")
+      const filterSizeSelect = document.getElementById("filter-size")
+      const filterTypeList = document.getElementById("filter-type-list")
+      const filterTypeClear = document.getElementById("filter-type-clear")
+      const filterLabel = document.getElementById("filter-label")
+      const filterBadge = document.getElementById("filter-badge")
+      const scanProgress = document.getElementById("scan-progress")
+      const scanProgressLabel = document.getElementById("scan-progress-label")
+      const scanProgressPct = document.getElementById("scan-progress-pct")
+      const scanProgressBar = document.getElementById("scan-progress-bar")
 
       let activeFileRecord = null // currently active file record (shared across layouts)
       let activeEntry = null
@@ -470,13 +558,37 @@
       let counts = { files: 0, folders: 0 }
       let totalSize = 0
       let dirHandle = null
+      let isScanning = false
 
-      // ---------- Data model (built once per directory scan, reused by both layouts) ----------
-      let fileRecords = [] // flat list of { id, name, ext, path[], entry, elTree, elList, _searchVisible }
-      let folderRecords = [] // list of { el, path[] } for tree search/expand logic
-      let folderChildren = new Map() // folder id -> { files: fileRecord[], folders: folderRecord[] } for O(1) child lookup
+      // ---------- Data model (built once per directory scan) ----------
+      // fileRecords: flat list of every file leaf: { id, name, ext, path[], entry, size, mtime, _searchVisible }
+      // treeModel: nested tree as returned by buildTree - directories carry aggregate .size/.mtime
+      // folderNodesList: every directory node, pushed in true post-order (descendants before their parent)
+      // folderChildren: folder id -> { files: fileRecord[], folders: dirNode[] } for O(1) child lookup
+      let fileRecords = []
+      let treeModel = []
+      let folderNodesList = []
+      let folderChildren = new Map()
       let layoutMode = "tree" // 'tree' | 'list'
       let lastQuery = ""
+
+      // ---------- Sort / filter state ----------
+      let sortKey = "name" // 'name' | 'type' | 'size' | 'modified'
+      let sortDir = "asc" // 'asc' | 'desc'
+      let typeFilter = new Set() // selected extensions to show; empty = show all
+      let sizeFilterBucket = "all"
+      let collapsedFolders = new Set() // folder ids (path.join('/')) currently collapsed
+
+      // ---------- Virtualization state ----------
+      const ROW_HEIGHT = 26 // px - must match the row markup below
+      const VIRTUAL_BUFFER = 8 // extra rows rendered above/below viewport
+      let flatTree = [] // current flattened, visible, sorted tree rows: { type, node, depth }
+      let flatList = [] // current flattened, visible, sorted list rows: file records
+      let activeVirtualUpdate = null // update() fn for whichever mode is currently shown
+
+      // ---------- Scan progress state ----------
+      let scanState = { done: 0, total: 0 }
+      let lastProgressUpdate = 0
 
       // ---------- Tab state (VSCode-style) ----------
       let tabs = [] // { id, record, name, ext, blobUrl, size, text }
@@ -775,53 +887,18 @@
           toast("Your browser does not support the File System Access API. Use Chrome or Edge.", "error")
           return
         }
+        if (isScanning) return
         try {
           const handle = await window.showDirectoryPicker()
           dirHandle = handle
 
-          // Reset state
-          treeView.innerHTML = ""
-          listView.innerHTML = ""
-          fileRecords = []
-          folderRecords = []
-          folderChildren = new Map()
-          counts = { files: 0, folders: 0 }
-          totalSize = 0
-          lastQuery = ""
-          searchInput.value = ""
-          noResultsState.classList.add("hidden")
+          // Fresh folder: reset collapse/filter state along with the data model
+          collapsedFolders = new Set()
+          typeFilter = new Set()
+          sizeFilterBucket = "all"
+          filterSizeSelect.value = "all"
 
-          // Reset any open tabs
-          tabs.forEach((t) => {
-            if (t.blobUrl) URL.revokeObjectURL(t.blobUrl)
-          })
-          tabs = []
-          activeTabId = null
-          activeFileRecord = null
-          renderTabs()
-
-          sidebarControls.classList.remove("hidden")
-          sidebarControls.classList.add("flex")
-          btnRefreshFolder.disabled = false
-          statsBar.classList.remove("hidden")
-          statsBar.classList.add("flex")
-          emptyState.classList.add("hidden")
-
-          toast("Scanning directory…", "info")
-
-          // Build an in-memory model of the whole tree first (concurrent recursion),
-          // then render both layouts from that model. This means switching between
-          // Tree/List afterwards is instant - no re-scan, no DOM rebuild.
-          const modelChildren = await buildTree(dirHandle, [])
-
-          renderTreeNodes(modelChildren, treeView)
-          renderListView()
-          applyLayout(layoutMode)
-
-          statRoot.textContent = dirHandle.name
-          statRoot.title = dirHandle.name
-          statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`
-          toast(`Loaded "${dirHandle.name}"`, "success")
+          await loadFolder(true)
         } catch (err) {
           if (err.name !== "AbortError") {
             console.error("[v0] Directory access error:", err)
@@ -830,40 +907,115 @@
         }
       })
 
-      // ---------- Refresh folder (re-scan from scratch) ----------
+      // ---------- Refresh folder (re-scan from scratch, keep view/filter state) ----------
       async function refreshFolder() {
-        if (!dirHandle) return
+        if (!dirHandle || isScanning) return
+        await loadFolder(false)
+      }
+      btnRefreshFolder.addEventListener("click", () => refreshFolder())
+
+      // ---------- Shared load routine used by both "Open Folder" and "Refresh" ----------
+      async function loadFolder(isFresh) {
+        isScanning = true
+        btnSelect.disabled = true
+        btnRefreshFolder.disabled = true
 
         treeView.innerHTML = ""
         listView.innerHTML = ""
         fileRecords = []
-        folderRecords = []
+        treeModel = []
+        folderNodesList = []
+        folderChildren = new Map()
         counts = { files: 0, folders: 0 }
         totalSize = 0
         lastQuery = ""
         searchInput.value = ""
         noResultsState.classList.add("hidden")
 
-        toast("Refreshing folder…", "info")
+        if (isFresh) {
+          tabs.forEach((t) => {
+            if (t.blobUrl) URL.revokeObjectURL(t.blobUrl)
+          })
+          tabs = []
+          activeTabId = null
+          activeFileRecord = null
+          renderTabs()
+        }
 
-        const modelChildren = await buildTree(dirHandle, [])
-        renderTreeNodes(modelChildren, treeView)
-        renderListView()
-        applyLayout(layoutMode)
+        sidebarControls.classList.remove("hidden")
+        sidebarControls.classList.add("flex")
+        statsBar.classList.remove("hidden")
+        statsBar.classList.add("flex")
+        emptyState.classList.add("hidden")
 
-        statRoot.textContent = dirHandle.name
-        statRoot.title = dirHandle.name
-        statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`
-        toast(`Refreshed "${dirHandle.name}"`, "success")
+        scanState = { done: 0, total: 0 }
+        lastProgressUpdate = 0
+        scanProgress.classList.remove("hidden")
+        scanProgress.classList.add("flex")
+        scanProgressLabel.textContent = isFresh ? "Scanning…" : "Refreshing…"
+        scanProgressPct.textContent = "0%"
+        scanProgressBar.value = 0
+        toast(isFresh ? "Scanning directory…" : "Refreshing folder…", "info")
+
+        try {
+          // Pass 1: cheap directory-listing-only walk to get a total count, so
+          // pass 2 (which reads file metadata) can report a real percentage.
+          scanState.total = await countEntries(dirHandle)
+
+          // Pass 2: build the in-memory model (concurrent recursion), updating
+          // scanState.done as each file/folder is processed.
+          const modelChildren = await buildTree(dirHandle, [])
+          treeModel = modelChildren
+
+          scanProgressPct.textContent = "100%"
+          scanProgressBar.value = 100
+
+          rebuildTypeFilterUI()
+          applyLayout(layoutMode)
+
+          statRoot.textContent = dirHandle.name
+          statRoot.title = dirHandle.name
+          statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`
+          toast(`${isFresh ? "Loaded" : "Refreshed"} "${dirHandle.name}"`, "success")
+        } catch (err) {
+          console.error("[v0] Scan error:", err)
+          toast("Failed to scan directory.", "error")
+        } finally {
+          isScanning = false
+          btnSelect.disabled = false
+          btnRefreshFolder.disabled = false
+          scanProgress.classList.add("hidden")
+          scanProgress.classList.remove("flex")
+        }
       }
 
-      btnRefreshFolder.addEventListener("click", () => refreshFolder())
+      // ---------- Pass 1: cheap recursive count (directory listing only, no file reads) ----------
+      async function countEntries(handle) {
+        const entries = []
+        for await (const entry of handle.values()) entries.push(entry)
+        const dirs = entries.filter((e) => e.kind === "directory")
+        const fileCount = entries.length - dirs.length
+        const subCounts = await asyncPool(8, dirs, (d) => countEntries(d))
+        return fileCount + dirs.length + subCounts.reduce((a, b) => a + b, 0)
+      }
 
-      // ---------- Build in-memory tree model ----------
-      // Reads subdirectories concurrently (Promise.all) instead of one-at-a-time
-      // depth-first awaiting, which materially speeds up scanning directories with
-      // many subfolders. File system metadata reads are I/O bound, so concurrency
-      // here is a genuine win rather than busy-work.
+      // ---------- Progress reporting (throttled) ----------
+      function reportProgress() {
+        const now = performance.now()
+        if (now - lastProgressUpdate < 50 && scanState.done < scanState.total) return
+        lastProgressUpdate = now
+        const pct = scanState.total ? Math.min(100, Math.round((scanState.done / scanState.total) * 100)) : 0
+        scanProgressPct.textContent = pct + "%"
+        scanProgressBar.value = pct
+      }
+
+      // ---------- Pass 2: build in-memory tree model ----------
+      // Reads subdirectories concurrently (bounded worker pool) instead of
+      // one-at-a-time depth-first awaiting, which materially speeds up scanning
+      // directories with many subfolders. File system metadata reads are I/O
+      // bound, so concurrency here is a genuine win rather than busy-work.
+      // Directory nodes carry aggregate .size/.mtime (sum/max of descendants)
+      // so folders can be sorted and filtered by the same metadata as files.
       async function buildTree(dirHandle, pathArray) {
         const entries = []
         for await (const entry of dirHandle.values()) entries.push(entry)
@@ -886,18 +1038,29 @@
           const currentPath = pathArray.concat(entry.name)
           counts.folders++
           const subChildren = await buildTree(entry, currentPath)
-          return { kind: "directory", name: entry.name, path: currentPath, children: subChildren }
+          const size = subChildren.reduce((s, c) => s + (c.size || 0), 0)
+          const mtime = subChildren.reduce((m, c) => Math.max(m, c.mtime || 0), 0)
+          const node = { kind: "directory", name: entry.name, path: currentPath, children: subChildren, size, mtime }
+          // Pushed here, after all descendants (incl. nested folders) have
+          // already been pushed by their own recursive calls - this gives a
+          // true post-order list, which visibility computation relies on.
+          folderNodesList.push(node)
+          scanState.done++
+          reportProgress()
+          return node
         })
 
         // Process all files at this level in parallel — getFile() is I/O-bound
-        // metalogic read, not content, so parallelism here is a real speedup.
+        // metadata read, not content, so parallelism here is a real speedup.
         const fileResults = await asyncPool(8, files, async (entry) => {
           counts.files++
           const ext = entry.name.split(".").pop().toLowerCase()
           let size = 0
+          let mtime = 0
           try {
             const file = await entry.getFile()
             size = file.size
+            mtime = file.lastModified || 0
             totalSize += size
           } catch (_) {
             /* unreadable */
@@ -911,11 +1074,12 @@
             path: currentPath,
             entry,
             size,
-            elTree: null,
-            elList: null,
+            mtime,
             _searchVisible: true,
           }
           fileRecords.push(record)
+          scanState.done++
+          reportProgress()
           return record
         })
 
@@ -930,84 +1094,301 @@
         return children
       }
 
-      // ---------- Row builder shared by both layouts ----------
-      function createFileRow(record, mode) {
-        const item = document.createElement("div")
-        item.className =
-          "file-item flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/60 text-xs transition-colors"
-        item.setAttribute("data-name", record.name.toLowerCase())
-        item.setAttribute("data-path", record.id.toLowerCase())
+      // ---------- Sorting (metadata-aware: name / type / size / modified) ----------
+      function compareEntries(a, b) {
+        let av, bv
+        switch (sortKey) {
+          case "size":
+            av = a.size || 0
+            bv = b.size || 0
+            break
+          case "modified":
+            av = a.mtime || 0
+            bv = b.mtime || 0
+            break
+          case "type":
+            av = a.kind === "directory" ? "" : a.ext || ""
+            bv = b.kind === "directory" ? "" : b.ext || ""
+            break
+          default:
+            av = a.name.toLowerCase()
+            bv = b.name.toLowerCase()
+        }
+        let cmp = typeof av === "string" ? av.localeCompare(bv) : av - bv
+        if (cmp === 0) cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        return sortDir === "asc" ? cmp : -cmp
+      }
 
-        if (mode === "list") {
-          const parentPath = record.path.slice(0, -1).join("/") || "/"
-          item.innerHTML = `${fileIconSvg(record.ext)}<div class="min-w-0 flex-1"><div class="truncate">${escapeHtml(record.name)}</div><div class="truncate text-[10px] text-base-content/30">${escapeHtml(parentPath)}</div></div>`
-        } else {
-          item.innerHTML = `${fileIconSvg(record.ext)}<span class="truncate">${escapeHtml(record.name)}</span>`
+      // ---------- Filtering (metadata-aware: type / size) ----------
+      function sizeBucketMatch(size) {
+        switch (sizeFilterBucket) {
+          case "lt100kb":
+            return size < 100 * 1024
+          case "100kb-1mb":
+            return size >= 100 * 1024 && size < 1024 * 1024
+          case "1mb-10mb":
+            return size >= 1024 * 1024 && size < 10 * 1024 * 1024
+          case "gt10mb":
+            return size >= 10 * 1024 * 1024
+          default:
+            return true
+        }
+      }
+      function fileMatchesFilters(r, query) {
+        if (query && !r.name.toLowerCase().includes(query)) return false
+        if (typeFilter.size && !typeFilter.has(r.ext)) return false
+        if (!sizeBucketMatch(r.size)) return false
+        return true
+      }
+      function filtersActive(query) {
+        return !!query || typeFilter.size > 0 || sizeFilterBucket !== "all"
+      }
+
+      // ---------- Visibility (bottom-up over folderNodesList, which is true post-order) ----------
+      function computeVisibility(query) {
+        for (const r of fileRecords) r._searchVisible = fileMatchesFilters(r, query)
+
+        const active = filtersActive(query)
+        const folderVisible = new Map()
+        for (const f of folderNodesList) {
+          const folderKey = f.path.join("/")
+          const nameMatch = !!query && f.name.toLowerCase().includes(query)
+          const children = folderChildren.get(folderKey)
+          let hasVisibleDescendant = false
+          if (children) {
+            hasVisibleDescendant =
+              children.files.some((r) => r._searchVisible) || children.folders.some((sub) => folderVisible.get(sub.path.join("/")))
+          }
+          folderVisible.set(folderKey, !active || nameMatch || hasVisibleDescendant)
+        }
+        return folderVisible
+      }
+
+      // ---------- Flatten tree model into visible, sorted rows (folders grouped before files, per level) ----------
+      function buildFlatTree(query) {
+        const folderVisible = computeVisibility(query)
+        const out = []
+        function walk(nodes, depth) {
+          const dirs = nodes.filter((n) => n.kind === "directory").sort(compareEntries)
+          const files = nodes.filter((n) => n.kind === "file").sort(compareEntries)
+          for (const d of dirs) {
+            const folderKey = d.path.join("/")
+            if (!folderVisible.get(folderKey)) continue
+            out.push({ type: "folder", node: d, depth })
+            if (!collapsedFolders.has(folderKey)) walk(d.children, depth + 1)
+          }
+          for (const fnode of files) {
+            if (!fnode._searchVisible) continue
+            out.push({ type: "file", node: fnode, depth })
+          }
+        }
+        walk(treeModel, 0)
+        return out
+      }
+
+      // ---------- Flatten file records into visible, sorted rows (list mode) ----------
+      function buildFlatList(query) {
+        computeVisibility(query)
+        return fileRecords.filter((r) => r._searchVisible).sort(compareEntries)
+      }
+
+      // ---------- Virtual scrolling ----------
+      // Renders only the rows currently within the scroll viewport (+ buffer)
+      // as real DOM nodes, using a full-height spacer so the scrollbar still
+      // reflects the true item count. Keeps the sidebar fast even with tens
+      // of thousands of files/folders.
+      function renderVirtual(container, items, rowRenderer) {
+        container.innerHTML = ""
+        container.style.position = "relative"
+        container.style.height = items.length * ROW_HEIGHT + "px"
+        const layer = document.createElement("div")
+        layer.style.position = "absolute"
+        layer.style.left = "0"
+        layer.style.right = "0"
+        layer.style.top = "0"
+        container.appendChild(layer)
+
+        function update() {
+          const scrollTop = fileTreeArea.scrollTop
+          const viewportHeight = fileTreeArea.clientHeight || 400
+          let startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - VIRTUAL_BUFFER)
+          let endIdx = Math.min(items.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + VIRTUAL_BUFFER)
+
+          layer.style.transform = `translateY(${startIdx * ROW_HEIGHT}px)`
+          layer.innerHTML = ""
+          const frag = document.createDocumentFragment()
+          for (let i = startIdx; i < endIdx; i++) {
+            frag.appendChild(rowRenderer(items[i], i))
+          }
+          layer.appendChild(frag)
         }
 
-        item.addEventListener("click", (e) => {
+        update()
+        activeVirtualUpdate = update
+        return update
+      }
+
+      // ---------- Row builders ----------
+      function buildFileRowEl(record, mode, depth) {
+        const el = document.createElement("div")
+        el.style.height = ROW_HEIGHT + "px"
+        el.style.paddingLeft = mode === "tree" ? 8 + depth * 14 + "px" : "8px"
+        const isActive = activeFileRecord && activeFileRecord.id === record.id
+        el.className =
+          "file-row flex items-center gap-1.5 pr-2 rounded-md cursor-pointer hover:bg-base-content/5 text-xs transition-colors " +
+          (isActive ? "row-active text-primary font-semibold" : "text-base-content/60")
+        el.setAttribute("data-row-id", record.id)
+        el.setAttribute("data-kind", "file")
+        if (mode === "list") {
+          const parentPath = record.path.slice(0, -1).join("/") || "/"
+          el.innerHTML = `${fileIconSvg(record.ext)}<div class="min-w-0 flex-1"><div class="truncate">${escapeHtml(record.name)}</div><div class="truncate text-[10px] text-base-content/30">${escapeHtml(parentPath)}</div></div><span class="text-[9px] text-base-content/30 shrink-0 tabular-nums">${humanSize(record.size || 0)}</span>`
+        } else {
+          el.innerHTML = `${fileIconSvg(record.ext)}<span class="truncate flex-1">${escapeHtml(record.name)}</span><span class="text-[9px] text-base-content/30 shrink-0 tabular-nums">${humanSize(record.size || 0)}</span>`
+        }
+        el.addEventListener("click", (e) => {
           e.stopPropagation()
           openFile(record)
         })
-
-        return item
+        return el
       }
 
-      // ---------- Tree layout: recursive DocumentFragment build (single reflow) ----------
-      function renderTreeNodes(nodes, container) {
-        const frag = document.createDocumentFragment()
-        for (const node of nodes) {
-          if (node.kind === "directory") {
-            const wrapper = document.createElement("div")
-            wrapper.className = "folder-wrapper fade-up"
-            wrapper.setAttribute("data-name", node.name.toLowerCase())
+      function treeRowRenderer(item) {
+        if (item.type === "file") return buildFileRowEl(item.node, "tree", item.depth)
 
-            const header = document.createElement("div")
-            header.className =
-              "folder-header flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/80 text-xs font-medium transition-colors"
-            header.innerHTML = `${arrowSvg}${folderIconSvg}<span class="truncate">${escapeHtml(node.name)}</span>`
-
-            const content = document.createElement("div")
-            content.className = "folder-content"
-            const inner = document.createElement("div")
-            inner.className = "pl-3 ml-2 border-l border-base-content/10 mt-0.5 space-y-0.5"
-            content.appendChild(inner)
-
-            wrapper.appendChild(header)
-            wrapper.appendChild(content)
-
-            header.addEventListener("click", (e) => {
-              e.stopPropagation()
-              wrapper.classList.toggle("collapsed")
-            })
-
-            // Recurse into children before this wrapper is attached to the live
-            // DOM - all nested appendChild calls happen off-document, so the
-            // browser only performs one layout pass when `frag` is finally
-            // attached, rather than one per node.
-            renderTreeNodes(node.children, inner)
-
-            folderRecords.push({ el: wrapper, path: node.path })
-            frag.appendChild(wrapper)
-          } else {
-            const item = createFileRow(node, "tree")
-            node.elTree = item
-            frag.appendChild(item)
-          }
-        }
-        container.appendChild(frag)
+        const node = item.node
+        const folderKey = node.path.join("/")
+        const collapsed = collapsedFolders.has(folderKey)
+        const el = document.createElement("div")
+        el.style.height = ROW_HEIGHT + "px"
+        el.style.paddingLeft = 8 + item.depth * 14 + "px"
+        el.className =
+          "folder-row flex items-center gap-1.5 pr-2 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/80 text-xs font-medium transition-colors"
+        el.setAttribute("data-row-id", folderKey)
+        el.setAttribute("data-kind", "folder")
+        const arrow = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3 shrink-0 text-base-content/40" style="transition:transform .15s ease;transform:rotate(${collapsed ? "-90deg" : "0deg"})"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`
+        el.innerHTML = `${arrow}${folderIconSvg}<span class="truncate flex-1">${escapeHtml(node.name)}</span><span class="text-[9px] text-base-content/30 shrink-0 tabular-nums">${humanSize(node.size || 0)}</span>`
+        el.addEventListener("click", (e) => {
+          e.stopPropagation()
+          if (collapsedFolders.has(folderKey)) collapsedFolders.delete(folderKey)
+          else collapsedFolders.add(folderKey)
+          recomputeAndRender()
+        })
+        return el
       }
 
-      // ---------- List layout: flat, sorted by full path ----------
-      function renderListView() {
-        const frag = document.createDocumentFragment()
-        const sorted = [...fileRecords].sort((a, b) => a.id.localeCompare(b.id))
-        for (const record of sorted) {
-          const item = createFileRow(record, "list")
-          record.elList = item
-          frag.appendChild(item)
+      function listRowRenderer(record) {
+        return buildFileRowEl(record, "list", 0)
+      }
+
+      // ---------- Recompute the flattened, sorted/filtered rows and re-render the active layout ----------
+      function recomputeAndRender() {
+        if (!fileRecords.length) {
+          noResultsState.classList.add("hidden")
+          return
         }
-        listView.appendChild(frag)
+        const query = lastQuery
+        const active = filtersActive(query)
+        if (layoutMode === "tree") {
+          flatTree = buildFlatTree(query)
+          renderVirtual(treeView, flatTree, treeRowRenderer)
+          noResultsState.classList.toggle("hidden", flatTree.length > 0 || !active)
+        } else {
+          flatList = buildFlatList(query)
+          renderVirtual(listView, flatList, listRowRenderer)
+          noResultsState.classList.toggle("hidden", flatList.length > 0 || !active)
+        }
+      }
+
+      // ---------- Type-filter checklist (built from the extensions actually present) ----------
+      function rebuildTypeFilterUI() {
+        const extCounts = new Map()
+        for (const r of fileRecords) extCounts.set(r.ext, (extCounts.get(r.ext) || 0) + 1)
+        const exts = [...extCounts.keys()].sort()
+
+        // Drop selections for extensions that no longer exist in this scan
+        for (const ext of [...typeFilter]) {
+          if (!extCounts.has(ext)) typeFilter.delete(ext)
+        }
+
+        filterTypeList.innerHTML = ""
+        const frag = document.createDocumentFragment()
+        for (const ext of exts) {
+          const label = document.createElement("label")
+          label.className = "flex items-center gap-1.5 text-[11px] cursor-pointer hover:text-base-content px-1 py-0.5 rounded"
+          label.innerHTML = `<input type="checkbox" class="checkbox checkbox-xs" ${typeFilter.has(ext) ? "checked" : ""} /><span class="flex-1 truncate">.${escapeHtml(ext || "?")}</span><span class="text-base-content/30 tabular-nums">${extCounts.get(ext)}</span>`
+          const input = label.querySelector("input")
+          input.addEventListener("change", () => {
+            if (input.checked) typeFilter.add(ext)
+            else typeFilter.delete(ext)
+            updateFilterBadge()
+            recomputeAndRender()
+          })
+          frag.appendChild(label)
+        }
+        filterTypeList.appendChild(frag)
+        updateFilterBadge()
+      }
+
+      function updateFilterBadge() {
+        const activeCount = typeFilter.size + (sizeFilterBucket !== "all" ? 1 : 0)
+        filterBadge.classList.toggle("hidden", activeCount === 0)
+        filterBadge.textContent = activeCount || ""
+        filterLabel.textContent = activeCount ? `Filter (${activeCount})` : "Filter"
+      }
+
+      filterSizeSelect.addEventListener("change", () => {
+        sizeFilterBucket = filterSizeSelect.value
+        updateFilterBadge()
+        recomputeAndRender()
+      })
+      filterTypeClear.addEventListener("click", () => {
+        typeFilter.clear()
+        rebuildTypeFilterUI()
+        recomputeAndRender()
+      })
+
+      sortKeySelect.addEventListener("change", () => {
+        sortKey = sortKeySelect.value
+        recomputeAndRender()
+      })
+      btnSortDir.addEventListener("click", () => {
+        sortDir = sortDir === "asc" ? "desc" : "asc"
+        sortDirIcon.style.transform = sortDir === "desc" ? "scaleY(-1)" : "none"
+        recomputeAndRender()
+      })
+
+      // Keep virtualized rows in sync with scrolling (rAF-throttled)
+      let scrollRaf = null
+      fileTreeArea.addEventListener(
+        "scroll",
+        () => {
+          if (scrollRaf) return
+          scrollRaf = requestAnimationFrame(() => {
+            scrollRaf = null
+            if (activeVirtualUpdate) activeVirtualUpdate()
+          })
+        },
+        { passive: true },
+      )
+      if (window.ResizeObserver) {
+        new ResizeObserver(() => {
+          if (activeVirtualUpdate) activeVirtualUpdate()
+        }).observe(fileTreeArea)
+      }
+
+      // ---------- Scroll a record into view within whichever layout is active ----------
+      function scrollToRecordIntoView(record) {
+        const items = layoutMode === "tree" ? flatTree : flatList
+        const idx =
+          layoutMode === "tree" ? items.findIndex((it) => it.type === "file" && it.node.id === record.id) : items.findIndex((r) => r.id === record.id)
+        if (idx === -1) return
+        const top = idx * ROW_HEIGHT
+        const bottom = top + ROW_HEIGHT
+        const viewTop = fileTreeArea.scrollTop
+        const viewBottom = viewTop + fileTreeArea.clientHeight
+        if (top < viewTop) fileTreeArea.scrollTop = top
+        else if (bottom > viewBottom) fileTreeArea.scrollTop = bottom - fileTreeArea.clientHeight
+        if (activeVirtualUpdate) activeVirtualUpdate()
       }
 
       // ---------- Layout (Tree/List) toggle ----------
@@ -1016,10 +1397,7 @@
         const hasFiles = fileRecords.length > 0
 
         treeView.classList.toggle("hidden", !(mode === "tree" && hasFiles))
-        treeView.classList.toggle("flex", mode === "tree" && hasFiles)
         listView.classList.toggle("hidden", !(mode === "list" && hasFiles))
-        listView.classList.toggle("flex", mode === "list" && hasFiles)
-
         treeActions.classList.toggle("hidden", mode !== "tree")
 
         const activeBtn = "btn-primary",
@@ -1029,14 +1407,9 @@
         btnLayoutList.classList.toggle(activeBtn, mode === "list")
         btnLayoutList.classList.toggle(inactiveBtn, mode !== "list")
 
-        // Re-apply any active search filter to the newly shown layout
-        performSearch(lastQuery)
+        recomputeAndRender()
 
-        // Keep the active row visible & highlighted in whichever layout is shown
-        if (activeFileRecord) {
-          const el = mode === "tree" ? activeFileRecord.elTree : activeFileRecord.elList
-          if (el) el.scrollIntoView({ block: "nearest" })
-        }
+        if (activeFileRecord) scrollToRecordIntoView(activeFileRecord)
       }
 
       btnLayoutTree.addEventListener("click", () => applyLayout("tree"))
@@ -1061,19 +1434,13 @@
         await activateTab(id)
       }
 
-      // ---------- Highlight a row across both pre-built layouts ----------
-      function setRowActive(record, active) {
-        if (!record) return
-        ;[record.elTree, record.elList].forEach((el) => {
-          if (!el) return
-          if (active) {
-            el.classList.remove("text-base-content/60")
-            el.classList.add("row-active", "text-primary", "font-semibold")
-          } else {
-            el.classList.remove("row-active", "text-primary", "font-semibold")
-            el.classList.add("text-base-content/60")
-          }
-        })
+      // ---------- Highlight the active row ----------
+      // Rows are virtualized (created/destroyed on scroll), so instead of
+      // holding element refs we just re-run whichever virtual update() is
+      // current - it re-renders only the handful of rows on screen, checking
+      // activeFileRecord as it builds each one.
+      function refreshActiveHighlight() {
+        if (activeVirtualUpdate) activeVirtualUpdate()
       }
 
       // ---------- Activate (focus) a tab ----------
@@ -1084,13 +1451,10 @@
         const { record } = tab
         const { entry, path } = record
 
-        // Sidebar highlight (works across tree + list simultaneously)
-        if (activeFileRecord) setRowActive(activeFileRecord, false)
-        setRowActive(record, true)
         activeFileRecord = record
         activeEntry = entry
-        const currentEl = layoutMode === "tree" ? record.elTree : record.elList
-        if (currentEl) currentEl.scrollIntoView({ block: "nearest" })
+        refreshActiveHighlight()
+        scrollToRecordIntoView(record)
 
         updateBreadcrumb(path)
         renderTabs()
@@ -1146,8 +1510,8 @@
         activeTabId = null
         activeEntry = null
         if (activeFileRecord) {
-          setRowActive(activeFileRecord, false)
           activeFileRecord = null
+          refreshActiveHighlight()
         }
         viewer.src = "about:blank"
         viewer.classList.add("hidden")
@@ -1358,55 +1722,12 @@
       })
 
       // ---------- Search ----------
-      // Fully in-memory: no DOM querySelector calls. Uses pre-built
-      // folderChildren index to propagate visibility up the tree in O(files)
-      // instead of O(folders × DOM queries).
+      // Fully in-memory, drives the same recomputeAndRender() pipeline used
+      // by sort/filter changes, so text search, type/size filters and sort
+      // order all compose together.
       function performSearch(query) {
         lastQuery = query
-        if (!fileRecords.length) {
-          noResultsState.classList.add("hidden")
-          return
-        }
-
-        let anyVisible = false
-
-        if (layoutMode === "tree") {
-          const folderVisible = new Map()
-
-          for (const r of fileRecords) {
-            r._searchVisible = !query || r.name.toLowerCase().includes(query)
-            if (r.elTree) r.elTree.style.display = r._searchVisible ? "" : "none"
-            if (r._searchVisible) anyVisible = true
-          }
-
-          for (let i = folderRecords.length - 1; i >= 0; i--) {
-            const f = folderRecords[i]
-            const folderKey = f.path.join("/")
-            const nameMatch = !query || f.path[f.path.length - 1].toLowerCase().includes(query)
-
-            const children = folderChildren.get(folderKey)
-            let hasVisibleDescendant = false
-            if (children) {
-              hasVisibleDescendant =
-                children.files.some((r) => r._searchVisible) || children.folders.some((sub) => folderVisible.get(sub.path.join("/")))
-            }
-
-            const visible = !query || nameMatch || hasVisibleDescendant
-            folderVisible.set(folderKey, visible)
-            f.el.style.display = visible ? "" : "none"
-            if (visible && query) f.el.classList.remove("collapsed")
-            if (visible) anyVisible = true
-          }
-        } else {
-          for (const r of fileRecords) {
-            const match = !query || r.name.toLowerCase().includes(query) || r.id.toLowerCase().includes(query)
-            r._searchVisible = match
-            if (r.elList) r.elList.style.display = match ? "" : "none"
-            if (match) anyVisible = true
-          }
-        }
-
-        noResultsState.classList.toggle("hidden", anyVisible || !query)
+        recomputeAndRender()
       }
 
       // Debounce: avoids expensive re-filtering on every keystroke for large trees
@@ -1418,10 +1739,12 @@
       })
 
       btnExpandAll.addEventListener("click", () => {
-        folderRecords.forEach((f) => f.el.classList.remove("collapsed"))
+        collapsedFolders.clear()
+        recomputeAndRender()
       })
       btnCollapseAll.addEventListener("click", () => {
-        folderRecords.forEach((f) => f.el.classList.add("collapsed"))
+        collapsedFolders = new Set(folderNodesList.map((f) => f.path.join("/")))
+        recomputeAndRender()
       })
 
       // ---------- Fullscreen ----------
@@ -1486,14 +1809,10 @@
 
       // ---------- Keyboard navigation ----------
       function visibleFiles() {
-        // Uses _searchVisible flag (set during performSearch) instead of
-        // offsetParent which forces synchronous layout recalculation.
-        return fileRecords.filter((r) => {
-          const el = layoutMode === "tree" ? r.elTree : r.elList
-          if (!el) return false
-          if (lastQuery && !r._searchVisible) return false
-          return el.offsetParent !== null
-        })
+        // Reads straight from the current flattened rows instead of
+        // querying the DOM - correct even for rows currently virtualized
+        // out of view, and skips files inside collapsed folders in tree mode.
+        return layoutMode === "tree" ? flatTree.filter((it) => it.type === "file").map((it) => it.node) : flatList
       }
       document.addEventListener("keydown", (e) => {
         const typing = document.activeElement === searchInput
