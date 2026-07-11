@@ -27,14 +27,14 @@ A single-file, browser-based file explorer for viewing local folders. No install
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|---|---|
-| `/` | Focus search |
-| `↑` / `↓` | Navigate files |
-| `F` | Toggle fullscreen |
-| `Ctrl/Cmd + W` | Close active tab |
-| `Ctrl + Tab` | Next tab (`Shift` for previous) |
-| `Esc` | Exit search |
+| Shortcut       | Action                          |
+| -------------- | ------------------------------- |
+| `/`            | Focus search                    |
+| `↑` / `↓`      | Navigate files                  |
+| `F`            | Toggle fullscreen               |
+| `Ctrl/Cmd + W` | Close active tab                |
+| `Ctrl + Tab`   | Next tab (`Shift` for previous) |
+| `Esc`          | Exit search                     |
 
 ## Notes
 
