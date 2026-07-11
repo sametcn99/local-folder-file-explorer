@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="black">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title></title>
     <!-- Tailwind CSS & DaisyUI CDN -->
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
@@ -14,1056 +14,1303 @@
          not for rendering; Monaco still does the actual syntax highlighting. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style type="text/tailwindcss">
-        /* Compact scrollbar using DaisyUI theme colors */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: oklch(var(--b2)); }
-        ::-webkit-scrollbar-thumb { background: oklch(var(--b3)); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: oklch(var(--bc) / 0.2); }
-        * { scrollbar-width: thin; scrollbar-color: oklch(var(--b3)) oklch(var(--b2)); }
+      /* Compact scrollbar using DaisyUI theme colors */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: oklch(var(--b2));
+      }
+      ::-webkit-scrollbar-thumb {
+        background: oklch(var(--b3));
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: oklch(var(--bc) / 0.2);
+      }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: oklch(var(--b3)) oklch(var(--b2));
+      }
 
-        /* Folder collapse animation */
-        .folder-content {
-            display: grid;
-            grid-template-rows: 1fr;
-            transition: grid-template-rows 0.22s ease;
+      /* Folder collapse animation */
+      .folder-content {
+        display: grid;
+        grid-template-rows: 1fr;
+        transition: grid-template-rows 0.22s ease;
+      }
+      .folder-content > div {
+        overflow: hidden;
+        min-height: 0;
+      }
+      .collapsed > .folder-content {
+        grid-template-rows: 0fr;
+      }
+      .collapsed > .folder-header .folder-arrow {
+        transform: rotate(-90deg);
+      }
+
+      .folder-arrow {
+        transition: transform 0.2s ease;
+      }
+
+      /* Prevent selection while resizing */
+      .resizing {
+        user-select: none;
+        cursor: col-resize;
+      }
+      .resizing iframe {
+        pointer-events: none;
+      }
+
+      /* Subtle fade-in for tree */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
         }
-        .folder-content > div { overflow: hidden; min-height: 0; }
-        .collapsed > .folder-content { grid-template-rows: 0fr; }
-        .collapsed > .folder-header .folder-arrow { transform: rotate(-90deg); }
-
-        .folder-arrow { transition: transform 0.2s ease; }
-
-        /* Prevent selection while resizing */
-        .resizing { user-select: none; cursor: col-resize; }
-        .resizing iframe { pointer-events: none; }
-
-        /* Subtle fade-in for tree */
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-        .fade-up { animation: fadeUp 0.25s ease both; }
+      }
+      .fade-up {
+        animation: fadeUp 0.25s ease both;
+      }
 
-        /* Paint containment on scrollable regions — isolates repaint scopes
+      /* Paint containment on scrollable regions — isolates repaint scopes
            so scrolling the file tree or tab bar doesn't trigger the viewer
            to re-composite. */
-        #file-tree, #tab-bar, #viewer-stage {
-            contain: layout style;
-        }
+      #file-tree,
+      #tab-bar,
+      #viewer-stage {
+        contain: layout style;
+      }
 
-        /* Row active glow */
-        .row-active {
-            background: color-mix(in oklch, var(--fallback-p,oklch(var(--p))) 18%, transparent);
-            box-shadow: inset 2px 0 0 0 var(--fallback-p,oklch(var(--p)));
-        }
+      /* Row active glow */
+      .row-active {
+        background: color-mix(in oklch, var(--fallback-p, oklch(var(--p))) 18%, transparent);
+        box-shadow: inset 2px 0 0 0 var(--fallback-p, oklch(var(--p)));
+      }
 
-        .drop-active {
-            outline: 2px dashed var(--fallback-p,oklch(var(--p)));
-            outline-offset: -8px;
-            background: color-mix(in oklch, var(--fallback-p,oklch(var(--p))) 6%, transparent);
-        }
+      .drop-active {
+        outline: 2px dashed var(--fallback-p, oklch(var(--p)));
+        outline-offset: -8px;
+        background: color-mix(in oklch, var(--fallback-p, oklch(var(--p))) 6%, transparent);
+      }
 
-        kbd { font-family: inherit; }
+      kbd {
+        font-family: inherit;
+      }
 
-        /* Right-edge tooltips: anchor from right side so they don't overflow viewport */
-        .tooltip-end.tooltip-bottom::before {
-            left: auto;
-            right: 0;
-            transform: none;
-        }
+      /* Right-edge tooltips: anchor from right side so they don't overflow viewport */
+      .tooltip-end.tooltip-bottom::before {
+        left: auto;
+        right: 0;
+        transform: none;
+      }
     </style>
-</head>
-<body class="h-screen w-screen flex flex-col bg-base-100 text-base-content overflow-hidden select-none antialiased">
-
+  </head>
+  <body class="h-screen w-screen flex flex-col bg-base-100 text-base-content overflow-hidden select-none antialiased">
     <!-- Top Navbar -->
     <header class="h-12 min-h-12 bg-base-200 backdrop-blur border-b border-base-content/10 px-3 flex items-center justify-between gap-3 z-20">
-        <div class="flex items-center gap-3 min-w-0">
-            <div class="flex items-center gap-2 shrink-0">
-                <span class="grid place-items-center w-7 h-7 rounded-md bg-primary/10 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5" /></svg>
-                </span>
-            </div>
-            <div class="divider divider-horizontal mx-0 hidden md:flex"></div>
-            <div id="breadcrumb" class="text-xs breadcrumbs py-0 overflow-hidden whitespace-nowrap min-w-0">
-                <ul>
-                    <li class="text-base-content/40">No file selected</li>
-                </ul>
-            </div>
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="grid place-items-center w-7 h-7 rounded-md bg-primary/10 text-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5"
+              />
+            </svg>
+          </span>
+        </div>
+        <div class="divider divider-horizontal mx-0 hidden md:flex"></div>
+        <div id="breadcrumb" class="text-xs breadcrumbs py-0 overflow-hidden whitespace-nowrap min-w-0">
+          <ul>
+            <li class="text-base-content/40">No file selected</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1 shrink-0">
+        <div id="file-info" class="badge badge-ghost badge-sm gap-1 font-mono text-[10px] hidden"></div>
+
+        <!-- Preview / Code toggle -->
+        <div id="view-toggle" class="hidden join mr-1 border border-base-content/10">
+          <button id="btn-view-preview" class="btn btn-xs join-item gap-1 btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
+              />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            Preview
+          </button>
+          <button id="btn-view-code" class="btn btn-xs join-item gap-1 btn-ghost">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z"
+              />
+            </svg>
+            Code
+          </button>
         </div>
 
-        <div class="flex items-center gap-1 shrink-0">
-            <div id="file-info" class="badge badge-ghost badge-sm gap-1 font-mono text-[10px] hidden"></div>
-
-            <!-- Preview / Code toggle -->
-            <div id="view-toggle" class="hidden join mr-1 border border-base-content/10">
-                <button id="btn-view-preview" class="btn btn-xs join-item gap-1 btn-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                    Preview
-                </button>
-                <button id="btn-view-code" class="btn btn-xs join-item gap-1 btn-ghost">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                    Code
-                </button>
-            </div>
-
-            <!-- Viewer toolbar (zoom + background) -->
-            <div id="viewer-toolbar" class="hidden items-center gap-0.5 bg-base-300 rounded-lg border border-base-content/10 px-1 py-0.5 mr-1">
-                <div class="tooltip tooltip-bottom" data-tip="Zoom out">
-                    <button id="btn-zoom-out" class="btn btn-ghost btn-xs btn-square">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
-                    </button>
-                </div>
-                <span id="zoom-label" class="text-[10px] font-mono w-9 text-center tabular-nums">100%</span>
-                <div class="tooltip tooltip-bottom" data-tip="Zoom in">
-                    <button id="btn-zoom-in" class="btn btn-ghost btn-xs btn-square">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" /></svg>
-                    </button>
-                </div>
-                <div class="tooltip tooltip-bottom" data-tip="Reset zoom">
-                    <button id="btn-zoom-reset" class="btn btn-ghost btn-xs">Reset</button>
-                </div>
-            </div>
-
-            <div class="tooltip tooltip-bottom" data-tip="Reload file">
-                <button id="btn-reload" class="btn btn-ghost btn-sm btn-square hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                </button>
-            </div>
-            <div class="tooltip tooltip-bottom tooltip-end" data-tip="Open in new tab">
-                <button id="btn-open-tab" class="btn btn-ghost btn-sm btn-square hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                </button>
-            </div>
-            <div class="tooltip tooltip-bottom tooltip-end" data-tip="Fullscreen (F)">
-                <button id="btn-fullscreen" class="btn btn-ghost btn-sm btn-square hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
-                </button>
-            </div>
+        <!-- Viewer toolbar (zoom + background) -->
+        <div id="viewer-toolbar" class="hidden items-center gap-0.5 bg-base-300 rounded-lg border border-base-content/10 px-1 py-0.5 mr-1">
+          <div class="tooltip tooltip-bottom" data-tip="Zoom out">
+            <button id="btn-zoom-out" class="btn btn-ghost btn-xs btn-square">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+              </svg>
+            </button>
+          </div>
+          <span id="zoom-label" class="text-[10px] font-mono w-9 text-center tabular-nums">100%</span>
+          <div class="tooltip tooltip-bottom" data-tip="Zoom in">
+            <button id="btn-zoom-in" class="btn btn-ghost btn-xs btn-square">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+              </svg>
+            </button>
+          </div>
+          <div class="tooltip tooltip-bottom" data-tip="Reset zoom">
+            <button id="btn-zoom-reset" class="btn btn-ghost btn-xs">Reset</button>
+          </div>
         </div>
+
+        <div class="tooltip tooltip-bottom" data-tip="Reload file">
+          <button id="btn-reload" class="btn btn-ghost btn-sm btn-square" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="tooltip tooltip-bottom tooltip-end" data-tip="Open in new tab">
+          <button id="btn-open-tab" class="btn btn-ghost btn-sm btn-square" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="tooltip tooltip-bottom tooltip-end" data-tip="Fullscreen (F)">
+          <button id="btn-fullscreen" class="btn btn-ghost btn-sm btn-square" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
     </header>
 
     <!-- Main Content -->
     <div class="flex flex-1 w-full overflow-hidden relative">
-
-        <!-- Sidebar -->
-        <aside id="sidebar" class="w-72 min-w-[240px] max-w-[520px] h-full bg-base-200/50 flex flex-col border-r border-base-content/10 shrink-0">
-            <div class="p-3 flex flex-col gap-2 border-b border-base-content/10">
-                <button id="btn-select" class="btn btn-primary btn-sm w-full gap-2 shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" /></svg>
-                    Open Folder
-                </button>
-
-                <!-- Search + controls -->
-                <div id="sidebar-controls" class="hidden flex-col gap-2">
-                    <label class="input input-sm input-bordered bg-base-100 flex items-center gap-2 h-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 opacity-50"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
-                        <input id="search-input" type="text" placeholder="Search files..." class="grow text-xs" />
-                        <kbd class="kbd kbd-xs opacity-60">/</kbd>
-                    </label>
-
-                    <div class="flex items-center gap-1">
-                        <!-- Tree / List layout toggle -->
-                        <div id="layout-toggle" class="flex w-full">
-                            <button id="btn-layout-tree" class="btn btn-xs flex-1 gap-1 btn-primary" title="Folder view">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5" /></svg>
-                                Tree
-                            </button>
-                            <button id="btn-layout-list" class="btn btn-xs flex-1 gap-1 btn-ghost" title="List view">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h.007v.008H3.75V6.75Zm0 5.25h.007v.008H3.75V12Zm0 5.25h.007v.008H3.75v-.008ZM6.75 6.75h13.5m-13.5 5.25h13.5m-13.5 5.25h13.5" /></svg>
-                                List
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="tree-actions" class="flex items-center gap-1">
-                        <button id="btn-expand-all" class="btn btn-xs btn-ghost flex-1 text-[10px] gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                            Expand
-                        </button>
-                        <button id="btn-collapse-all" class="btn btn-xs btn-ghost flex-1 text-[10px] gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>
-                            Collapse
-                        </button>
-                        <button id="btn-refresh-folder" class="btn btn-xs btn-ghost text-[10px] gap-1" title="Refresh folder">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tree / List area -->
-            <div id="file-tree" class="flex-grow overflow-y-auto p-2 text-sm relative">
-                <div id="empty-state" class="flex flex-col items-center justify-center text-center text-base-content/40 gap-3 mt-16 px-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-12 h-12 opacity-40"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5" /></svg>
-                    <p class="text-xs leading-relaxed">Open a directory to explore<br>your workspace files.</p>
-                </div>
-                <div id="no-results-state" class="hidden flex-col items-center justify-center text-center text-base-content/30 gap-2 mt-16 px-4">
-                    <p class="text-xs leading-relaxed">No files match your search.</p>
-                </div>
-
-                <!-- Tree (folder) view -->
-                <div id="tree-view" class="hidden flex-col"></div>
-
-                <!-- Flat list view -->
-                <div id="list-view" class="hidden flex-col"></div>
-            </div>
-
-            <!-- Stats footer -->
-            <div id="stats-bar" class="hidden items-center justify-between px-3 h-7 border-t border-base-content/10 text-[10px] font-mono text-base-content/50">
-                <span id="stat-root" class="truncate max-w-[55%]"></span>
-                <span id="stat-count"></span>
-            </div>
-        </aside>
-
-        <!-- Resizer -->
-        <div id="resizer" class="w-1 h-full bg-transparent hover:bg-primary/50 active:bg-primary transition-colors cursor-col-resize shrink-0 z-10"></div>
-
-        <!-- Viewer -->
-        <main id="viewer-container" class="flex-grow h-full bg-base-100 min-w-0 flex flex-col">
-          <!-- Tab bar (VSCode-style) -->
-          <div id="tab-bar" class="hidden items-stretch h-9 min-h-9 bg-base-200/50 border-b border-base-content/10 overflow-x-auto overflow-y-hidden shrink-0"></div>
-
-          <!-- Viewer stage -->
-          <div id="viewer-stage" class="relative flex-1 min-h-0">
-            <!-- Placeholder -->
-            <div id="placeholder" class="absolute inset-0 bg-base-100 flex flex-col items-center justify-center text-base-content/40 gap-4 z-10 px-6 text-center">
-                <div class="grid place-items-center w-20 h-20 rounded-2xl bg-base-300 border border-base-content/10">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-10 h-10 opacity-50"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-sm font-medium text-base-content/70">No document selected</p>
-                    <p class="text-xs max-w-xs leading-relaxed">Select a file from the sidebar to render it. HTML and text-based files are displayed as documents.</p>
-                </div>
-                <div class="flex flex-wrap items-center justify-center gap-2 text-[10px] text-base-content/30 mt-2">
-                    <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">/</kbd> search</span>
-                    <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd> navigate</span>
-                    <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">F</kbd> fullscreen</span>
-                </div>
-            </div>
-
-            <!-- Loading -->
-            <div id="loading" class="hidden absolute inset-0 bg-base-100 backdrop-blur-sm flex-col items-center justify-center z-30 gap-3">
-                <span class="loading loading-spinner loading-md text-primary"></span>
-                <span class="text-xs text-base-content/50">Loading document...</span>
-            </div>
-
-            <iframe id="viewer" class="w-full h-full border-none bg-white hidden origin-top-left" name="viewer" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
-
-            <!-- Monaco code editor -->
-            <div id="code-editor" class="absolute inset-0 hidden bg-base-100"></div>
+      <!-- Sidebar -->
+      <aside id="sidebar" class="w-72 min-w-[240px] max-w-[520px] h-full bg-base-200/50 flex flex-col border-r border-base-content/10 shrink-0">
+        <div class="p-3 flex flex-col gap-2 border-b border-base-content/10">
+          <div class="flex items-center gap-1">
+            <button id="btn-select" class="btn btn-primary btn-sm flex-1 gap-2 shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"
+                />
+              </svg>
+              Open Folder
+            </button>
+            <button id="btn-refresh-folder" class="btn btn-primary btn-sm btn-square" title="Refresh folder" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"
+                />
+              </svg>
+            </button>
           </div>
-        </main>
+
+          <!-- Search + controls -->
+          <div id="sidebar-controls" class="hidden flex-col gap-2">
+            <label class="input input-sm input-bordered bg-base-100 flex items-center gap-2 h-8">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+                class="w-3.5 h-3.5 opacity-50"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                />
+              </svg>
+              <input id="search-input" type="text" placeholder="Search files..." class="grow text-xs" />
+              <kbd class="kbd kbd-xs opacity-60">/</kbd>
+            </label>
+
+            <div class="flex items-center gap-1">
+              <!-- Tree / List layout toggle -->
+              <div id="layout-toggle" class="flex w-full">
+                <button id="btn-layout-tree" class="btn btn-xs flex-1 gap-1 btn-primary" title="Folder view">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5"
+                    />
+                  </svg>
+                  Tree
+                </button>
+                <button id="btn-layout-list" class="btn btn-xs flex-1 gap-1 btn-ghost" title="List view">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M3.75 6.75h.007v.008H3.75V6.75Zm0 5.25h.007v.008H3.75V12Zm0 5.25h.007v.008H3.75v-.008ZM6.75 6.75h13.5m-13.5 5.25h13.5m-13.5 5.25h13.5"
+                    />
+                  </svg>
+                  List
+                </button>
+              </div>
+            </div>
+
+            <div id="tree-actions" class="flex items-center gap-1">
+              <button id="btn-expand-all" class="btn btn-xs btn-ghost flex-1 text-[10px] gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+                Expand
+              </button>
+              <button id="btn-collapse-all" class="btn btn-xs btn-ghost flex-1 text-[10px] gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+                </svg>
+                Collapse
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tree / List area -->
+        <div id="file-tree" class="flex-grow overflow-y-auto p-2 text-sm relative">
+          <div id="empty-state" class="flex flex-col items-center justify-center text-center text-base-content/40 gap-3 mt-16 px-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1"
+              stroke="currentColor"
+              class="w-12 h-12 opacity-40"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5"
+              />
+            </svg>
+            <p class="text-xs leading-relaxed">Open a directory to explore<br />your workspace files.</p>
+          </div>
+          <div id="no-results-state" class="hidden flex-col items-center justify-center text-center text-base-content/30 gap-2 mt-16 px-4">
+            <p class="text-xs leading-relaxed">No files match your search.</p>
+          </div>
+
+          <!-- Tree (folder) view -->
+          <div id="tree-view" class="hidden flex-col"></div>
+
+          <!-- Flat list view -->
+          <div id="list-view" class="hidden flex-col"></div>
+        </div>
+
+        <!-- Stats footer -->
+        <div
+          id="stats-bar"
+          class="hidden items-center justify-between px-3 h-7 border-t border-base-content/10 text-[10px] font-mono text-base-content/50"
+        >
+          <span id="stat-root" class="truncate max-w-[55%]"></span>
+          <span id="stat-count"></span>
+        </div>
+      </aside>
+
+      <!-- Resizer -->
+      <div
+        id="resizer"
+        class="w-1 h-full bg-transparent hover:bg-primary/50 active:bg-primary transition-colors cursor-col-resize shrink-0 z-10"
+      ></div>
+
+      <!-- Viewer -->
+      <main id="viewer-container" class="flex-grow h-full bg-base-100 min-w-0 flex flex-col">
+        <!-- Tab bar (VSCode-style) -->
+        <div
+          id="tab-bar"
+          class="hidden items-stretch h-9 min-h-9 bg-base-200/50 border-b border-base-content/10 overflow-x-auto overflow-y-hidden shrink-0"
+        ></div>
+
+        <!-- Viewer stage -->
+        <div id="viewer-stage" class="relative flex-1 min-h-0">
+          <!-- Placeholder -->
+          <div
+            id="placeholder"
+            class="absolute inset-0 bg-base-100 flex flex-col items-center justify-center text-base-content/40 gap-4 z-10 px-6 text-center"
+          >
+            <div class="grid place-items-center w-20 h-20 rounded-2xl bg-base-300 border border-base-content/10">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1"
+                stroke="currentColor"
+                class="w-10 h-10 opacity-50"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                />
+              </svg>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-base-content/70">No document selected</p>
+              <p class="text-xs max-w-xs leading-relaxed">
+                Select a file from the sidebar to render it. HTML and text-based files are displayed as documents.
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2 text-[10px] text-base-content/30 mt-2">
+              <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">/</kbd> search</span>
+              <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd> navigate</span>
+              <span class="flex items-center gap-1"><kbd class="kbd kbd-xs">F</kbd> fullscreen</span>
+            </div>
+          </div>
+
+          <!-- Loading -->
+          <div id="loading" class="hidden absolute inset-0 bg-base-100 backdrop-blur-sm flex-col items-center justify-center z-30 gap-3">
+            <span class="loading loading-spinner loading-md text-primary"></span>
+            <span class="text-xs text-base-content/50">Loading document...</span>
+          </div>
+
+          <iframe
+            id="viewer"
+            class="w-full h-full border-none bg-white hidden origin-top-left"
+            name="viewer"
+            sandbox="allow-same-origin allow-scripts allow-popups"
+          ></iframe>
+
+          <!-- Monaco code editor -->
+          <div id="code-editor" class="absolute inset-0 hidden bg-base-100"></div>
+        </div>
+      </main>
     </div>
 
     <!-- Toast container -->
     <div id="toast" class="toast toast-bottom toast-center z-50"></div>
 
     <script>
-        const btnSelect = document.getElementById('btn-select');
-        const fileTreeArea = document.getElementById('file-tree');
-        const treeView = document.getElementById('tree-view');
-        const listView = document.getElementById('list-view');
-        const emptyState = document.getElementById('empty-state');
-        const noResultsState = document.getElementById('no-results-state');
-        const viewer = document.getElementById('viewer');
-        const placeholder = document.getElementById('placeholder');
-        const loading = document.getElementById('loading');
-        const sidebarControls = document.getElementById('sidebar-controls');
-        const searchInput = document.getElementById('search-input');
-        const treeActions = document.getElementById('tree-actions');
-        const btnExpandAll = document.getElementById('btn-expand-all');
-        const btnCollapseAll = document.getElementById('btn-collapse-all');
-        const btnRefreshFolder = document.getElementById('btn-refresh-folder');
-        const btnLayoutTree = document.getElementById('btn-layout-tree');
-        const btnLayoutList = document.getElementById('btn-layout-list');
-        const breadcrumb = document.getElementById('breadcrumb');
-        const btnFullscreen = document.getElementById('btn-fullscreen');
-        const btnReload = document.getElementById('btn-reload');
-        const btnOpenTab = document.getElementById('btn-open-tab');
-        const viewerContainer = document.getElementById('viewer-container');
-        const viewerToolbar = document.getElementById('viewer-toolbar');
-        const sidebar = document.getElementById('sidebar');
-        const resizer = document.getElementById('resizer');
-        const fileInfo = document.getElementById('file-info');
-        const statsBar = document.getElementById('stats-bar');
-        const statRoot = document.getElementById('stat-root');
-        const statCount = document.getElementById('stat-count');
-        const btnZoomIn = document.getElementById('btn-zoom-in');
-        const btnZoomOut = document.getElementById('btn-zoom-out');
-        const btnZoomReset = document.getElementById('btn-zoom-reset');
-        const zoomLabel = document.getElementById('zoom-label');
-        const tabBar = document.getElementById('tab-bar');
-        const viewToggle = document.getElementById('view-toggle');
-        const btnViewPreview = document.getElementById('btn-view-preview');
-        const btnViewCode = document.getElementById('btn-view-code');
-        const codeEditorEl = document.getElementById('code-editor');
+      const btnSelect = document.getElementById("btn-select")
+      const fileTreeArea = document.getElementById("file-tree")
+      const treeView = document.getElementById("tree-view")
+      const listView = document.getElementById("list-view")
+      const emptyState = document.getElementById("empty-state")
+      const noResultsState = document.getElementById("no-results-state")
+      const viewer = document.getElementById("viewer")
+      const placeholder = document.getElementById("placeholder")
+      const loading = document.getElementById("loading")
+      const sidebarControls = document.getElementById("sidebar-controls")
+      const searchInput = document.getElementById("search-input")
+      const treeActions = document.getElementById("tree-actions")
+      const btnExpandAll = document.getElementById("btn-expand-all")
+      const btnCollapseAll = document.getElementById("btn-collapse-all")
+      const btnRefreshFolder = document.getElementById("btn-refresh-folder")
+      const btnLayoutTree = document.getElementById("btn-layout-tree")
+      const btnLayoutList = document.getElementById("btn-layout-list")
+      const breadcrumb = document.getElementById("breadcrumb")
+      const btnFullscreen = document.getElementById("btn-fullscreen")
+      const btnReload = document.getElementById("btn-reload")
+      const btnOpenTab = document.getElementById("btn-open-tab")
+      const viewerContainer = document.getElementById("viewer-container")
+      const viewerToolbar = document.getElementById("viewer-toolbar")
+      const sidebar = document.getElementById("sidebar")
+      const resizer = document.getElementById("resizer")
+      const fileInfo = document.getElementById("file-info")
+      const statsBar = document.getElementById("stats-bar")
+      const statRoot = document.getElementById("stat-root")
+      const statCount = document.getElementById("stat-count")
+      const btnZoomIn = document.getElementById("btn-zoom-in")
+      const btnZoomOut = document.getElementById("btn-zoom-out")
+      const btnZoomReset = document.getElementById("btn-zoom-reset")
+      const zoomLabel = document.getElementById("zoom-label")
+      const tabBar = document.getElementById("tab-bar")
+      const viewToggle = document.getElementById("view-toggle")
+      const btnViewPreview = document.getElementById("btn-view-preview")
+      const btnViewCode = document.getElementById("btn-view-code")
+      const codeEditorEl = document.getElementById("code-editor")
 
-        let activeFileRecord = null;   // currently active file record (shared across layouts)
-        let activeEntry = null;
-        let zoom = 1;
-        let counts = { files: 0, folders: 0 };
-        let totalSize = 0;
-        let dirHandle = null;
+      let activeFileRecord = null // currently active file record (shared across layouts)
+      let activeEntry = null
+      let zoom = 1
+      let counts = { files: 0, folders: 0 }
+      let totalSize = 0
+      let dirHandle = null
 
-        // ---------- Data model (built once per directory scan, reused by both layouts) ----------
-        let fileRecords = [];    // flat list of { id, name, ext, path[], entry, elTree, elList, _searchVisible }
-        let folderRecords = [];  // list of { el, path[] } for tree search/expand logic
-        let folderChildren = new Map(); // folder id -> { files: fileRecord[], folders: folderRecord[] } for O(1) child lookup
-        let layoutMode = 'tree'; // 'tree' | 'list'
-        let lastQuery = '';
+      // ---------- Data model (built once per directory scan, reused by both layouts) ----------
+      let fileRecords = [] // flat list of { id, name, ext, path[], entry, elTree, elList, _searchVisible }
+      let folderRecords = [] // list of { el, path[] } for tree search/expand logic
+      let folderChildren = new Map() // folder id -> { files: fileRecord[], folders: folderRecord[] } for O(1) child lookup
+      let layoutMode = "tree" // 'tree' | 'list'
+      let lastQuery = ""
 
-        // ---------- Tab state (VSCode-style) ----------
-        let tabs = [];          // { id, record, name, ext, blobUrl, size, text }
-        let activeTabId = null;
+      // ---------- Tab state (VSCode-style) ----------
+      let tabs = [] // { id, record, name, ext, blobUrl, size, text }
+      let activeTabId = null
 
-        // ---------- View mode (preview | code) ----------
-        let viewMode = 'preview';
-        let monacoEditor = null;
-        let monacoReady = false;
+      // ---------- View mode (preview | code) ----------
+      let viewMode = "preview"
+      let monacoEditor = null
+      let monacoReady = false
 
-        // Manual overrides - these win over Monaco's auto-derived mapping below,
-        // to guarantee previously-supported extensions always resolve the same way.
-        const langMap = {
-            html: 'html', htm: 'html', css: 'css', js: 'javascript', mjs: 'javascript',
-            ts: 'typescript', tsx: 'typescript', jsx: 'javascript', json: 'json',
-            md: 'markdown', xml: 'xml', svg: 'xml', txt: 'plaintext', csv: 'plaintext',
-            yml: 'yaml', yaml: 'yaml', sh: 'shell', py: 'python'
-        };
+      // Manual overrides - these win over Monaco's auto-derived mapping below,
+      // to guarantee previously-supported extensions always resolve the same way.
+      const langMap = {
+        html: "html",
+        htm: "html",
+        css: "css",
+        js: "javascript",
+        mjs: "javascript",
+        ts: "typescript",
+        tsx: "typescript",
+        jsx: "javascript",
+        json: "json",
+        md: "markdown",
+        xml: "xml",
+        svg: "xml",
+        txt: "plaintext",
+        csv: "plaintext",
+        yml: "yaml",
+        yaml: "yaml",
+        sh: "shell",
+        py: "python",
+      }
 
-        // Populated dynamically from monaco.languages.getLanguages() once Monaco is
-        // ready - this covers every language bundled with the editor (Go, Rust, C#,
-        // Java, PHP, Ruby, SQL, PowerShell, Dockerfile, INI, and many more) instead
-        // of relying on a short hand-maintained list.
-        const extLanguageMap = new Map();
-        const filenameLanguageMap = new Map();
-        const validMonacoLanguageIds = new Set();
+      // Populated dynamically from monaco.languages.getLanguages() once Monaco is
+      // ready - this covers every language bundled with the editor (Go, Rust, C#,
+      // Java, PHP, Ruby, SQL, PowerShell, Dockerfile, INI, and many more) instead
+      // of relying on a short hand-maintained list.
+      const extLanguageMap = new Map()
+      const filenameLanguageMap = new Map()
+      const validMonacoLanguageIds = new Set()
 
-        // highlight.js language name -> Monaco language id, for the handful of cases
-        // where the two ecosystems use different identifiers for the same language.
-        const hljsToMonaco = {
-            bash: 'shell', sh: 'shell', shell: 'shell', zsh: 'shell',
-            cs: 'csharp', csharp: 'csharp',
-            'c++': 'cpp', cpp: 'cpp',
-            objectivec: 'objective-c',
-            yml: 'yaml',
-            md: 'markdown', markdown: 'markdown',
-            golang: 'go',
-            vbnet: 'vb',
-            vim: 'plaintext',
-            makefile: 'makefile',
-            dockerfile: 'dockerfile'
-        };
+      // highlight.js language name -> Monaco language id, for the handful of cases
+      // where the two ecosystems use different identifiers for the same language.
+      const hljsToMonaco = {
+        bash: "shell",
+        sh: "shell",
+        shell: "shell",
+        zsh: "shell",
+        cs: "csharp",
+        csharp: "csharp",
+        "c++": "cpp",
+        cpp: "cpp",
+        objectivec: "objective-c",
+        yml: "yaml",
+        md: "markdown",
+        markdown: "markdown",
+        golang: "go",
+        vbnet: "vb",
+        vim: "plaintext",
+        makefile: "makefile",
+        dockerfile: "dockerfile",
+      }
 
-        // Boot Monaco loader
-        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
-        require(['vs/editor/editor.main'], function () {
-            // Build the extension/filename -> language-id maps from every language
-            // Monaco knows about, then layer our manual overrides on top.
-            monaco.languages.getLanguages().forEach((lang) => {
-                validMonacoLanguageIds.add(lang.id);
-                (lang.extensions || []).forEach((ext) => {
-                    const clean = ext.replace(/^\./, '').toLowerCase();
-                    if (!extLanguageMap.has(clean)) extLanguageMap.set(clean, lang.id);
-                });
-                (lang.filenames || []).forEach((fn) => {
-                    filenameLanguageMap.set(fn.toLowerCase(), lang.id);
-                });
-            });
-            Object.entries(langMap).forEach(([ext, id]) => extLanguageMap.set(ext, id));
+      // Boot Monaco loader
+      require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" } })
+      require(["vs/editor/editor.main"], function () {
+        // Build the extension/filename -> language-id maps from every language
+        // Monaco knows about, then layer our manual overrides on top.
+        monaco.languages.getLanguages().forEach((lang) => {
+          validMonacoLanguageIds.add(lang.id)
+          ;(lang.extensions || []).forEach((ext) => {
+            const clean = ext.replace(/^\./, "").toLowerCase()
+            if (!extLanguageMap.has(clean)) extLanguageMap.set(clean, lang.id)
+          })
+          ;(lang.filenames || []).forEach((fn) => {
+            filenameLanguageMap.set(fn.toLowerCase(), lang.id)
+          })
+        })
+        Object.entries(langMap).forEach(([ext, id]) => extLanguageMap.set(ext, id))
 
-            monacoReady = true;
-            if (viewMode === 'code' && activeTabId) showCode();
-        });
+        monacoReady = true
+        if (viewMode === "code" && activeTabId) showCode()
+      })
 
-        // ---------- Automatic language detection ----------
-        // Order of precedence:
-        //   1. Exact special filenames (Dockerfile, Makefile, ...)
-        //   2. Extension known to Monaco/overrides (fast, deterministic - covers the vast majority of files)
-        //   3. Shebang line (#!/usr/bin/env python, #!/bin/bash, ...) for extension-less scripts
-        //   4. highlight.js statistical auto-detection (hljs.highlightAuto) for anything still unresolved
-        //   5. plaintext fallback
-        function detectLanguage(tab) {
-            const name = tab.name.toLowerCase();
+      // ---------- Automatic language detection ----------
+      // Order of precedence:
+      //   1. Exact special filenames (Dockerfile, Makefile, ...)
+      //   2. Extension known to Monaco/overrides (fast, deterministic - covers the vast majority of files)
+      //   3. Shebang line (#!/usr/bin/env python, #!/bin/bash, ...) for extension-less scripts
+      //   4. highlight.js statistical auto-detection (hljs.highlightAuto) for anything still unresolved
+      //   5. plaintext fallback
+      function detectLanguage(tab) {
+        const name = tab.name.toLowerCase()
 
-            if (filenameLanguageMap.has(name)) return filenameLanguageMap.get(name);
-            if (extLanguageMap.has(tab.ext)) return extLanguageMap.get(tab.ext);
+        if (filenameLanguageMap.has(name)) return filenameLanguageMap.get(name)
+        if (extLanguageMap.has(tab.ext)) return extLanguageMap.get(tab.ext)
 
-            const text = tab.text || '';
-            const firstLine = (text.slice(0, 300).split(/\r?\n/, 1)[0] || '');
+        const text = tab.text || ""
+        const firstLine = text.slice(0, 300).split(/\r?\n/, 1)[0] || ""
 
-            if (firstLine.startsWith('#!')) {
-                if (/\b(bash|sh|zsh)\b/.test(firstLine)) return 'shell';
-                if (/\bpython/.test(firstLine)) return 'python';
-                if (/\bnode/.test(firstLine)) return 'javascript';
-                if (/\bruby/.test(firstLine)) return 'ruby';
-                if (/\bperl/.test(firstLine)) return 'perl';
-                if (/\bphp/.test(firstLine)) return 'php';
-            }
-
-            const trimmed = text.trim();
-            if (trimmed && trimmed.length < 5_000_000) {
-                if (trimmed[0] === '{' || trimmed[0] === '[') {
-                    try { JSON.parse(trimmed); return 'json'; } catch (_) { /* not JSON, fall through */ }
-                }
-                if (/^<\?xml/i.test(trimmed)) return 'xml';
-                if (/^<!DOCTYPE html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) return 'html';
-            }
-
-            // Statistical fallback via highlight.js: only reached for extension-less
-            // or unrecognized files, so the cost of running it is negligible overall.
-            if (window.hljs && trimmed) {
-                try {
-                    const guess = hljs.highlightAuto(trimmed.slice(0, 5000));
-                    if (guess && guess.language) {
-                        const mapped = hljsToMonaco[guess.language] || guess.language;
-                        if (validMonacoLanguageIds.has(mapped)) return mapped;
-                    }
-                } catch (_) { /* hljs failed to guess, fall through to plaintext */ }
-            }
-
-            return 'plaintext';
+        if (firstLine.startsWith("#!")) {
+          if (/\b(bash|sh|zsh)\b/.test(firstLine)) return "shell"
+          if (/\bpython/.test(firstLine)) return "python"
+          if (/\bnode/.test(firstLine)) return "javascript"
+          if (/\bruby/.test(firstLine)) return "ruby"
+          if (/\bperl/.test(firstLine)) return "perl"
+          if (/\bphp/.test(firstLine)) return "php"
         }
 
-        function ensureEditor() {
-            if (monacoEditor || !monacoReady) return monacoEditor;
-            monacoEditor = monaco.editor.create(codeEditorEl, {
-                value: '',
-                language: 'html',
-                theme: 'vs-dark',
-                readOnly: true,
-                automaticLayout: true,
-                fontSize: 13,
-                lineHeight: 20,
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                smoothScrolling: true,
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                padding: { top: 10 }
-            });
-            return monacoEditor;
-        }
-
-        function showCode() {
-            const tab = tabs.find(t => t.id === activeTabId);
-            if (!tab) return;
-            viewer.classList.add('hidden');
-            codeEditorEl.classList.remove('hidden');
-            viewerToolbar.classList.add('hidden');
-            viewerToolbar.classList.remove('flex');
-            if (!monacoReady) { loading.classList.remove('hidden'); loading.classList.add('flex'); return; }
-            loading.classList.add('hidden'); loading.classList.remove('flex');
-            const ed = ensureEditor();
-            const lang = detectLanguage(tab);
-            const old = ed.getModel();
-            const model = monaco.editor.createModel(tab.text || '', lang);
-            ed.setModel(model);
-            if (old) old.dispose();
-            ed.layout();
-        }
-
-        function showPreview() {
-            codeEditorEl.classList.add('hidden');
-            viewer.classList.remove('hidden');
-            viewerToolbar.classList.remove('hidden');
-            viewerToolbar.classList.add('flex');
-        }
-
-        function setViewMode(mode) {
-            viewMode = mode;
-            const active = 'btn-primary';
-            const inactive = 'btn-ghost';
-            if (mode === 'code') {
-                btnViewCode.classList.add(active); btnViewCode.classList.remove(inactive);
-                btnViewPreview.classList.add(inactive); btnViewPreview.classList.remove(active);
-                showCode();
-            } else {
-                btnViewPreview.classList.add(active); btnViewPreview.classList.remove(inactive);
-                btnViewCode.classList.add(inactive); btnViewCode.classList.remove(active);
-                showPreview();
-            }
-        }
-
-        btnViewPreview.addEventListener('click', () => setViewMode('preview'));
-        btnViewCode.addEventListener('click', () => setViewMode('code'));
-
-        // ---------- Utilities ----------
-        function toast(msg, type = 'info') {
-            const el = document.createElement('div');
-            const cls = { info: 'alert-info', success: 'alert-success', error: 'alert-error', warning: 'alert-warning' }[type] || '';
-            el.className = `alert ${cls} py-2 px-3 text-xs shadow-lg`;
-            el.textContent = msg;
-            document.getElementById('toast').appendChild(el);
-            setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 2200);
-            setTimeout(() => el.remove(), 2600);
-        }
-
-        function humanSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-
-        // Escape untrusted file/folder names before injecting as innerHTML (safety + correctness)
-        const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-        function escapeHtml(str) {
-            return String(str).replace(/[&<>"']/g, (c) => escapeMap[c]);
-        }
-
-        const iconColors = {
-            html: 'text-warning', htm: 'text-warning',
-            css: 'text-info', js: 'text-warning', mjs: 'text-warning',
-            ts: 'text-info', tsx: 'text-info', jsx: 'text-info',
-            json: 'text-warning', md: 'text-neutral',
-            txt: 'text-neutral', csv: 'text-success',
-            xml: 'text-error', svg: 'text-secondary',
-            png: 'text-secondary', jpg: 'text-secondary', jpeg: 'text-secondary', gif: 'text-secondary', webp: 'text-secondary',
-            pdf: 'text-error'
-        };
-
-        // Memoize generated icon markup per extension - large trees repeat the same
-        // extensions hundreds of times, so building the SVG string once per ext avoids
-        // redundant template-literal work during tree/list construction.
-        const fileIconCache = new Map();
-        function fileIconSvg(ext) {
-            if (fileIconCache.has(ext)) return fileIconCache.get(ext);
-            const color = iconColors[ext] || 'text-base-content/50';
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="w-3.5 h-3.5 shrink-0 ${color}"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`;
-            fileIconCache.set(ext, svg);
-            return svg;
-        }
-
-        const folderIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="w-3.5 h-3.5 shrink-0 text-primary"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5" /></svg>`;
-
-        const arrowSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="folder-arrow w-3 h-3 shrink-0 text-base-content/40"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
-
-        // ---------- Concurrency limiter ----------
-        // Replaces unbounded Promise.all with a capped worker pool so deeply
-        // nested directories don't spawn thousands of simultaneous I/O calls.
-        function asyncPool(limit, items, fn) {
-            const results = new Array(items.length);
-            let cursor = 0;
-            const worker = async () => {
-                while (cursor < items.length) {
-                    const idx = cursor++;
-                    results[idx] = await fn(items[idx], idx);
-                }
-            };
-            const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
-            return Promise.all(workers).then(() => results);
-        }
-
-        // ---------- Directory picker ----------
-        btnSelect.addEventListener('click', async () => {
-            if (!window.showDirectoryPicker) {
-                toast('Your browser does not support the File System Access API. Use Chrome or Edge.', 'error');
-                return;
-            }
+        const trimmed = text.trim()
+        if (trimmed && trimmed.length < 5_000_000) {
+          if (trimmed[0] === "{" || trimmed[0] === "[") {
             try {
-                const handle = await window.showDirectoryPicker();
-                dirHandle = handle;
-
-                // Reset state
-                treeView.innerHTML = '';
-                listView.innerHTML = '';
-                fileRecords = [];
-                folderRecords = [];
-                folderChildren = new Map();
-                counts = { files: 0, folders: 0 };
-                totalSize = 0;
-                lastQuery = '';
-                searchInput.value = '';
-                noResultsState.classList.add('hidden');
-
-                // Reset any open tabs
-                tabs.forEach(t => { if (t.blobUrl) URL.revokeObjectURL(t.blobUrl); });
-                tabs = [];
-                activeTabId = null;
-                activeFileRecord = null;
-                renderTabs();
-
-                sidebarControls.classList.remove('hidden');
-                sidebarControls.classList.add('flex');
-                statsBar.classList.remove('hidden');
-                statsBar.classList.add('flex');
-                emptyState.classList.add('hidden');
-
-                toast('Scanning directory…', 'info');
-
-                // Build an in-memory model of the whole tree first (concurrent recursion),
-                // then render both layouts from that model. This means switching between
-                // Tree/List afterwards is instant - no re-scan, no DOM rebuild.
-                const modelChildren = await buildTree(dirHandle, []);
-
-                renderTreeNodes(modelChildren, treeView);
-                renderListView();
-                applyLayout(layoutMode);
-
-                statRoot.textContent = dirHandle.name;
-                statRoot.title = dirHandle.name;
-                statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`;
-                toast(`Loaded "${dirHandle.name}"`, 'success');
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('[v0] Directory access error:', err);
-                    toast('Could not open directory.', 'error');
-                }
+              JSON.parse(trimmed)
+              return "json"
+            } catch (_) {
+              /* not JSON, fall through */
             }
-        });
-
-        // ---------- Refresh folder (re-scan from scratch) ----------
-        async function refreshFolder() {
-            if (!dirHandle) return;
-
-            treeView.innerHTML = '';
-            listView.innerHTML = '';
-            fileRecords = [];
-            folderRecords = [];
-            counts = { files: 0, folders: 0 };
-            totalSize = 0;
-            lastQuery = '';
-            searchInput.value = '';
-            noResultsState.classList.add('hidden');
-
-            toast('Refreshing folder…', 'info');
-
-            const modelChildren = await buildTree(dirHandle, []);
-            renderTreeNodes(modelChildren, treeView);
-            renderListView();
-            applyLayout(layoutMode);
-
-            statRoot.textContent = dirHandle.name;
-            statRoot.title = dirHandle.name;
-            statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`;
-            toast(`Refreshed "${dirHandle.name}"`, 'success');
+          }
+          if (/^<\?xml/i.test(trimmed)) return "xml"
+          if (/^<!DOCTYPE html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) return "html"
         }
 
-        btnRefreshFolder.addEventListener('click', () => refreshFolder());
-
-        // ---------- Build in-memory tree model ----------
-        // Reads subdirectories concurrently (Promise.all) instead of one-at-a-time
-        // depth-first awaiting, which materially speeds up scanning directories with
-        // many subfolders. File system metadata reads are I/O bound, so concurrency
-        // here is a genuine win rather than busy-work.
-        async function buildTree(dirHandle, pathArray) {
-            const entries = [];
-            for await (const entry of dirHandle.values()) entries.push(entry);
-
-            entries.sort((a, b) => {
-                if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
-                return a.name.localeCompare(b.name);
-            });
-
-            const dirs = [];
-            const files = [];
-            for (const entry of entries) {
-                if (entry.kind === 'directory') dirs.push(entry);
-                else files.push(entry);
+        // Statistical fallback via highlight.js: only reached for extension-less
+        // or unrecognized files, so the cost of running it is negligible overall.
+        if (window.hljs && trimmed) {
+          try {
+            const guess = hljs.highlightAuto(trimmed.slice(0, 5000))
+            if (guess && guess.language) {
+              const mapped = hljsToMonaco[guess.language] || guess.language
+              if (validMonacoLanguageIds.has(mapped)) return mapped
             }
-
-            // Process subdirectories with bounded concurrency (max 8 parallel
-            // sub-tree scans) to avoid cascading Promise.all fan-out in deep trees.
-            const subResults = await asyncPool(8, dirs, async (entry) => {
-                const currentPath = pathArray.concat(entry.name);
-                counts.folders++;
-                const subChildren = await buildTree(entry, currentPath);
-                return { kind: 'directory', name: entry.name, path: currentPath, children: subChildren };
-            });
-
-            // Process all files at this level in parallel — getFile() is I/O-bound
-            // metalogic read, not content, so parallelism here is a real speedup.
-            const fileResults = await asyncPool(8, files, async (entry) => {
-                counts.files++;
-                const ext = entry.name.split('.').pop().toLowerCase();
-                let size = 0;
-                try {
-                    const file = await entry.getFile();
-                    size = file.size;
-                    totalSize += size;
-                } catch (_) { /* unreadable */ }
-                const currentPath = pathArray.concat(entry.name);
-                const record = {
-                    kind: 'file',
-                    id: currentPath.join('/'),
-                    name: entry.name,
-                    ext,
-                    path: currentPath,
-                    entry,
-                    size,
-                    elTree: null,
-                    elList: null,
-                    _searchVisible: true
-                };
-                fileRecords.push(record);
-                return record;
-            });
-
-            // Pre-index folder children for O(1) lookups during search
-            const folderId = pathArray.join('/') || '/';
-            folderChildren.set(folderId, {
-                files: fileResults,
-                folders: subResults
-            });
-
-            const children = [...subResults, ...fileResults];
-            return children;
+          } catch (_) {
+            /* hljs failed to guess, fall through to plaintext */
+          }
         }
 
-        // ---------- Row builder shared by both layouts ----------
-        function createFileRow(record, mode) {
-            const item = document.createElement('div');
-            item.className = 'file-item flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/60 text-xs transition-colors';
-            item.setAttribute('data-name', record.name.toLowerCase());
-            item.setAttribute('data-path', record.id.toLowerCase());
+        return "plaintext"
+      }
 
-            if (mode === 'list') {
-                const parentPath = record.path.slice(0, -1).join('/') || '/';
-                item.innerHTML = `${fileIconSvg(record.ext)}<div class="min-w-0 flex-1"><div class="truncate">${escapeHtml(record.name)}</div><div class="truncate text-[10px] text-base-content/30">${escapeHtml(parentPath)}</div></div>`;
-            } else {
-                item.innerHTML = `${fileIconSvg(record.ext)}<span class="truncate">${escapeHtml(record.name)}</span>`;
+      function ensureEditor() {
+        if (monacoEditor || !monacoReady) return monacoEditor
+        monacoEditor = monaco.editor.create(codeEditorEl, {
+          value: "",
+          language: "html",
+          theme: "vs-dark",
+          readOnly: true,
+          automaticLayout: true,
+          fontSize: 13,
+          lineHeight: 20,
+          minimap: { enabled: true },
+          scrollBeyondLastLine: false,
+          smoothScrolling: true,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          padding: { top: 10 },
+        })
+        return monacoEditor
+      }
+
+      function showCode() {
+        const tab = tabs.find((t) => t.id === activeTabId)
+        if (!tab) return
+        viewer.classList.add("hidden")
+        codeEditorEl.classList.remove("hidden")
+        viewerToolbar.classList.add("hidden")
+        viewerToolbar.classList.remove("flex")
+        if (!monacoReady) {
+          loading.classList.remove("hidden")
+          loading.classList.add("flex")
+          return
+        }
+        loading.classList.add("hidden")
+        loading.classList.remove("flex")
+        const ed = ensureEditor()
+        const lang = detectLanguage(tab)
+        const old = ed.getModel()
+        const model = monaco.editor.createModel(tab.text || "", lang)
+        ed.setModel(model)
+        if (old) old.dispose()
+        ed.layout()
+      }
+
+      function showPreview() {
+        codeEditorEl.classList.add("hidden")
+        viewer.classList.remove("hidden")
+        viewerToolbar.classList.remove("hidden")
+        viewerToolbar.classList.add("flex")
+      }
+
+      function setViewMode(mode) {
+        viewMode = mode
+        const active = "btn-primary"
+        const inactive = "btn-ghost"
+        if (mode === "code") {
+          btnViewCode.classList.add(active)
+          btnViewCode.classList.remove(inactive)
+          btnViewPreview.classList.add(inactive)
+          btnViewPreview.classList.remove(active)
+          showCode()
+        } else {
+          btnViewPreview.classList.add(active)
+          btnViewPreview.classList.remove(inactive)
+          btnViewCode.classList.add(inactive)
+          btnViewCode.classList.remove(active)
+          showPreview()
+        }
+      }
+
+      btnViewPreview.addEventListener("click", () => setViewMode("preview"))
+      btnViewCode.addEventListener("click", () => setViewMode("code"))
+
+      // ---------- Utilities ----------
+      function toast(msg, type = "info") {
+        const el = document.createElement("div")
+        const cls = { info: "alert-info", success: "alert-success", error: "alert-error", warning: "alert-warning" }[type] || ""
+        el.className = `alert ${cls} py-2 px-3 text-xs shadow-lg`
+        el.textContent = msg
+        document.getElementById("toast").appendChild(el)
+        setTimeout(() => {
+          el.style.opacity = "0"
+          el.style.transition = "opacity .3s"
+        }, 2200)
+        setTimeout(() => el.remove(), 2600)
+      }
+
+      function humanSize(bytes) {
+        if (bytes < 1024) return bytes + " B"
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+      }
+
+      // Escape untrusted file/folder names before injecting as innerHTML (safety + correctness)
+      const escapeMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }
+      function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, (c) => escapeMap[c])
+      }
+
+      const iconColors = {
+        html: "text-warning",
+        htm: "text-warning",
+        css: "text-info",
+        js: "text-warning",
+        mjs: "text-warning",
+        ts: "text-info",
+        tsx: "text-info",
+        jsx: "text-info",
+        json: "text-warning",
+        md: "text-neutral",
+        txt: "text-neutral",
+        csv: "text-success",
+        xml: "text-error",
+        svg: "text-secondary",
+        png: "text-secondary",
+        jpg: "text-secondary",
+        jpeg: "text-secondary",
+        gif: "text-secondary",
+        webp: "text-secondary",
+        pdf: "text-error",
+      }
+
+      // Memoize generated icon markup per extension - large trees repeat the same
+      // extensions hundreds of times, so building the SVG string once per ext avoids
+      // redundant template-literal work during tree/list construction.
+      const fileIconCache = new Map()
+      function fileIconSvg(ext) {
+        if (fileIconCache.has(ext)) return fileIconCache.get(ext)
+        const color = iconColors[ext] || "text-base-content/50"
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="w-3.5 h-3.5 shrink-0 ${color}"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`
+        fileIconCache.set(ext, svg)
+        return svg
+      }
+
+      const folderIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="w-3.5 h-3.5 shrink-0 text-primary"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0A2.25 2.25 0 0 0 4.5 15h15a2.25 2.25 0 0 0 2.25-2.25m-19.5 0v.25A2.25 2.25 0 0 0 4.5 17.25h15a2.25 2.25 0 0 0 2.25-2.25v-.25M16.5 9.75V5.25A2.25 2.25 0 0 0 14.25 3h-4.5A2.25 2.25 0 0 0 7.5 5.25v4.5m9 0H7.5" /></svg>`
+
+      const arrowSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="folder-arrow w-3 h-3 shrink-0 text-base-content/40"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`
+
+      // ---------- Concurrency limiter ----------
+      // Replaces unbounded Promise.all with a capped worker pool so deeply
+      // nested directories don't spawn thousands of simultaneous I/O calls.
+      function asyncPool(limit, items, fn) {
+        const results = new Array(items.length)
+        let cursor = 0
+        const worker = async () => {
+          while (cursor < items.length) {
+            const idx = cursor++
+            results[idx] = await fn(items[idx], idx)
+          }
+        }
+        const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker())
+        return Promise.all(workers).then(() => results)
+      }
+
+      // ---------- Directory picker ----------
+      btnSelect.addEventListener("click", async () => {
+        if (!window.showDirectoryPicker) {
+          toast("Your browser does not support the File System Access API. Use Chrome or Edge.", "error")
+          return
+        }
+        try {
+          const handle = await window.showDirectoryPicker()
+          dirHandle = handle
+
+          // Reset state
+          treeView.innerHTML = ""
+          listView.innerHTML = ""
+          fileRecords = []
+          folderRecords = []
+          folderChildren = new Map()
+          counts = { files: 0, folders: 0 }
+          totalSize = 0
+          lastQuery = ""
+          searchInput.value = ""
+          noResultsState.classList.add("hidden")
+
+          // Reset any open tabs
+          tabs.forEach((t) => {
+            if (t.blobUrl) URL.revokeObjectURL(t.blobUrl)
+          })
+          tabs = []
+          activeTabId = null
+          activeFileRecord = null
+          renderTabs()
+
+          sidebarControls.classList.remove("hidden")
+          sidebarControls.classList.add("flex")
+          btnRefreshFolder.disabled = false
+          statsBar.classList.remove("hidden")
+          statsBar.classList.add("flex")
+          emptyState.classList.add("hidden")
+
+          toast("Scanning directory…", "info")
+
+          // Build an in-memory model of the whole tree first (concurrent recursion),
+          // then render both layouts from that model. This means switching between
+          // Tree/List afterwards is instant - no re-scan, no DOM rebuild.
+          const modelChildren = await buildTree(dirHandle, [])
+
+          renderTreeNodes(modelChildren, treeView)
+          renderListView()
+          applyLayout(layoutMode)
+
+          statRoot.textContent = dirHandle.name
+          statRoot.title = dirHandle.name
+          statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`
+          toast(`Loaded "${dirHandle.name}"`, "success")
+        } catch (err) {
+          if (err.name !== "AbortError") {
+            console.error("[v0] Directory access error:", err)
+            toast("Could not open directory.", "error")
+          }
+        }
+      })
+
+      // ---------- Refresh folder (re-scan from scratch) ----------
+      async function refreshFolder() {
+        if (!dirHandle) return
+
+        treeView.innerHTML = ""
+        listView.innerHTML = ""
+        fileRecords = []
+        folderRecords = []
+        counts = { files: 0, folders: 0 }
+        totalSize = 0
+        lastQuery = ""
+        searchInput.value = ""
+        noResultsState.classList.add("hidden")
+
+        toast("Refreshing folder…", "info")
+
+        const modelChildren = await buildTree(dirHandle, [])
+        renderTreeNodes(modelChildren, treeView)
+        renderListView()
+        applyLayout(layoutMode)
+
+        statRoot.textContent = dirHandle.name
+        statRoot.title = dirHandle.name
+        statCount.textContent = `${counts.files} files · ${counts.folders} folders · ${humanSize(totalSize)}`
+        toast(`Refreshed "${dirHandle.name}"`, "success")
+      }
+
+      btnRefreshFolder.addEventListener("click", () => refreshFolder())
+
+      // ---------- Build in-memory tree model ----------
+      // Reads subdirectories concurrently (Promise.all) instead of one-at-a-time
+      // depth-first awaiting, which materially speeds up scanning directories with
+      // many subfolders. File system metadata reads are I/O bound, so concurrency
+      // here is a genuine win rather than busy-work.
+      async function buildTree(dirHandle, pathArray) {
+        const entries = []
+        for await (const entry of dirHandle.values()) entries.push(entry)
+
+        entries.sort((a, b) => {
+          if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1
+          return a.name.localeCompare(b.name)
+        })
+
+        const dirs = []
+        const files = []
+        for (const entry of entries) {
+          if (entry.kind === "directory") dirs.push(entry)
+          else files.push(entry)
+        }
+
+        // Process subdirectories with bounded concurrency (max 8 parallel
+        // sub-tree scans) to avoid cascading Promise.all fan-out in deep trees.
+        const subResults = await asyncPool(8, dirs, async (entry) => {
+          const currentPath = pathArray.concat(entry.name)
+          counts.folders++
+          const subChildren = await buildTree(entry, currentPath)
+          return { kind: "directory", name: entry.name, path: currentPath, children: subChildren }
+        })
+
+        // Process all files at this level in parallel — getFile() is I/O-bound
+        // metalogic read, not content, so parallelism here is a real speedup.
+        const fileResults = await asyncPool(8, files, async (entry) => {
+          counts.files++
+          const ext = entry.name.split(".").pop().toLowerCase()
+          let size = 0
+          try {
+            const file = await entry.getFile()
+            size = file.size
+            totalSize += size
+          } catch (_) {
+            /* unreadable */
+          }
+          const currentPath = pathArray.concat(entry.name)
+          const record = {
+            kind: "file",
+            id: currentPath.join("/"),
+            name: entry.name,
+            ext,
+            path: currentPath,
+            entry,
+            size,
+            elTree: null,
+            elList: null,
+            _searchVisible: true,
+          }
+          fileRecords.push(record)
+          return record
+        })
+
+        // Pre-index folder children for O(1) lookups during search
+        const folderId = pathArray.join("/") || "/"
+        folderChildren.set(folderId, {
+          files: fileResults,
+          folders: subResults,
+        })
+
+        const children = [...subResults, ...fileResults]
+        return children
+      }
+
+      // ---------- Row builder shared by both layouts ----------
+      function createFileRow(record, mode) {
+        const item = document.createElement("div")
+        item.className =
+          "file-item flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/60 text-xs transition-colors"
+        item.setAttribute("data-name", record.name.toLowerCase())
+        item.setAttribute("data-path", record.id.toLowerCase())
+
+        if (mode === "list") {
+          const parentPath = record.path.slice(0, -1).join("/") || "/"
+          item.innerHTML = `${fileIconSvg(record.ext)}<div class="min-w-0 flex-1"><div class="truncate">${escapeHtml(record.name)}</div><div class="truncate text-[10px] text-base-content/30">${escapeHtml(parentPath)}</div></div>`
+        } else {
+          item.innerHTML = `${fileIconSvg(record.ext)}<span class="truncate">${escapeHtml(record.name)}</span>`
+        }
+
+        item.addEventListener("click", (e) => {
+          e.stopPropagation()
+          openFile(record)
+        })
+
+        return item
+      }
+
+      // ---------- Tree layout: recursive DocumentFragment build (single reflow) ----------
+      function renderTreeNodes(nodes, container) {
+        const frag = document.createDocumentFragment()
+        for (const node of nodes) {
+          if (node.kind === "directory") {
+            const wrapper = document.createElement("div")
+            wrapper.className = "folder-wrapper fade-up"
+            wrapper.setAttribute("data-name", node.name.toLowerCase())
+
+            const header = document.createElement("div")
+            header.className =
+              "folder-header flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/80 text-xs font-medium transition-colors"
+            header.innerHTML = `${arrowSvg}${folderIconSvg}<span class="truncate">${escapeHtml(node.name)}</span>`
+
+            const content = document.createElement("div")
+            content.className = "folder-content"
+            const inner = document.createElement("div")
+            inner.className = "pl-3 ml-2 border-l border-base-content/10 mt-0.5 space-y-0.5"
+            content.appendChild(inner)
+
+            wrapper.appendChild(header)
+            wrapper.appendChild(content)
+
+            header.addEventListener("click", (e) => {
+              e.stopPropagation()
+              wrapper.classList.toggle("collapsed")
+            })
+
+            // Recurse into children before this wrapper is attached to the live
+            // DOM - all nested appendChild calls happen off-document, so the
+            // browser only performs one layout pass when `frag` is finally
+            // attached, rather than one per node.
+            renderTreeNodes(node.children, inner)
+
+            folderRecords.push({ el: wrapper, path: node.path })
+            frag.appendChild(wrapper)
+          } else {
+            const item = createFileRow(node, "tree")
+            node.elTree = item
+            frag.appendChild(item)
+          }
+        }
+        container.appendChild(frag)
+      }
+
+      // ---------- List layout: flat, sorted by full path ----------
+      function renderListView() {
+        const frag = document.createDocumentFragment()
+        const sorted = [...fileRecords].sort((a, b) => a.id.localeCompare(b.id))
+        for (const record of sorted) {
+          const item = createFileRow(record, "list")
+          record.elList = item
+          frag.appendChild(item)
+        }
+        listView.appendChild(frag)
+      }
+
+      // ---------- Layout (Tree/List) toggle ----------
+      function applyLayout(mode) {
+        layoutMode = mode
+        const hasFiles = fileRecords.length > 0
+
+        treeView.classList.toggle("hidden", !(mode === "tree" && hasFiles))
+        treeView.classList.toggle("flex", mode === "tree" && hasFiles)
+        listView.classList.toggle("hidden", !(mode === "list" && hasFiles))
+        listView.classList.toggle("flex", mode === "list" && hasFiles)
+
+        treeActions.classList.toggle("hidden", mode !== "tree")
+
+        const activeBtn = "btn-primary",
+          inactiveBtn = "btn-ghost"
+        btnLayoutTree.classList.toggle(activeBtn, mode === "tree")
+        btnLayoutTree.classList.toggle(inactiveBtn, mode !== "tree")
+        btnLayoutList.classList.toggle(activeBtn, mode === "list")
+        btnLayoutList.classList.toggle(inactiveBtn, mode !== "list")
+
+        // Re-apply any active search filter to the newly shown layout
+        performSearch(lastQuery)
+
+        // Keep the active row visible & highlighted in whichever layout is shown
+        if (activeFileRecord) {
+          const el = mode === "tree" ? activeFileRecord.elTree : activeFileRecord.elList
+          if (el) el.scrollIntoView({ block: "nearest" })
+        }
+      }
+
+      btnLayoutTree.addEventListener("click", () => applyLayout("tree"))
+      btnLayoutList.addEventListener("click", () => applyLayout("list"))
+
+      // ---------- Open file -> open or focus a tab ----------
+      async function openFile(record) {
+        const id = record.id
+        let tab = tabs.find((t) => t.id === id)
+        if (!tab) {
+          tab = {
+            id,
+            record,
+            name: record.name,
+            ext: record.ext,
+            blobUrl: null,
+            size: 0,
+          }
+          tabs.push(tab)
+          renderTabs()
+        }
+        await activateTab(id)
+      }
+
+      // ---------- Highlight a row across both pre-built layouts ----------
+      function setRowActive(record, active) {
+        if (!record) return
+        ;[record.elTree, record.elList].forEach((el) => {
+          if (!el) return
+          if (active) {
+            el.classList.remove("text-base-content/60")
+            el.classList.add("row-active", "text-primary", "font-semibold")
+          } else {
+            el.classList.remove("row-active", "text-primary", "font-semibold")
+            el.classList.add("text-base-content/60")
+          }
+        })
+      }
+
+      // ---------- Activate (focus) a tab ----------
+      async function activateTab(id) {
+        const tab = tabs.find((t) => t.id === id)
+        if (!tab) return
+        activeTabId = id
+        const { record } = tab
+        const { entry, path } = record
+
+        // Sidebar highlight (works across tree + list simultaneously)
+        if (activeFileRecord) setRowActive(activeFileRecord, false)
+        setRowActive(record, true)
+        activeFileRecord = record
+        activeEntry = entry
+        const currentEl = layoutMode === "tree" ? record.elTree : record.elList
+        if (currentEl) currentEl.scrollIntoView({ block: "nearest" })
+
+        updateBreadcrumb(path)
+        renderTabs()
+
+        loading.classList.remove("hidden")
+        loading.classList.add("flex")
+
+        try {
+          if (!tab.blobUrl) {
+            const file = await entry.getFile()
+            const text = await file.text()
+            tab.size = file.size
+            tab.text = text
+            const blob = new Blob([text], { type: "text/html" })
+            tab.blobUrl = URL.createObjectURL(blob)
+          }
+
+          fileInfo.textContent = `${humanSize(tab.size)} · .${tab.ext}`
+          fileInfo.classList.remove("hidden")
+          fileInfo.classList.add("md:inline-flex")
+
+          viewer.onload = () => {
+            if (viewMode === "preview") {
+              loading.classList.add("hidden")
+              loading.classList.remove("flex")
             }
+          }
+          viewer.src = tab.blobUrl
 
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openFile(record);
-            });
+          placeholder.style.display = "none"
+          viewToggle.classList.remove("hidden")
+          viewToggle.classList.add("flex")
+          btnFullscreen.disabled = false
+          btnReload.disabled = false
+          btnOpenTab.disabled = false
 
-            return item;
+          // Render according to current view mode
+          if (viewMode === "code") {
+            showCode()
+          } else {
+            showPreview()
+          }
+        } catch (err) {
+          console.error("[v0] File read error:", err)
+          toast("Failed to read file.", "error")
+          loading.classList.add("hidden")
+          loading.classList.remove("flex")
         }
+      }
 
-        // ---------- Tree layout: recursive DocumentFragment build (single reflow) ----------
-        function renderTreeNodes(nodes, container) {
-            const frag = document.createDocumentFragment();
-            for (const node of nodes) {
-                if (node.kind === 'directory') {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'folder-wrapper fade-up';
-                    wrapper.setAttribute('data-name', node.name.toLowerCase());
-
-                    const header = document.createElement('div');
-                    header.className = 'folder-header flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-base-content/5 text-base-content/80 text-xs font-medium transition-colors';
-                    header.innerHTML = `${arrowSvg}${folderIconSvg}<span class="truncate">${escapeHtml(node.name)}</span>`;
-
-                    const content = document.createElement('div');
-                    content.className = 'folder-content';
-                    const inner = document.createElement('div');
-                    inner.className = 'pl-3 ml-2 border-l border-base-content/10 mt-0.5 space-y-0.5';
-                    content.appendChild(inner);
-
-                    wrapper.appendChild(header);
-                    wrapper.appendChild(content);
-
-                    header.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        wrapper.classList.toggle('collapsed');
-        });
-
-                    // Recurse into children before this wrapper is attached to the live
-                    // DOM - all nested appendChild calls happen off-document, so the
-                    // browser only performs one layout pass when `frag` is finally
-                    // attached, rather than one per node.
-                    renderTreeNodes(node.children, inner);
-
-                    folderRecords.push({ el: wrapper, path: node.path });
-                    frag.appendChild(wrapper);
-                } else {
-                    const item = createFileRow(node, 'tree');
-                    node.elTree = item;
-                    frag.appendChild(item);
-                }
-            }
-            container.appendChild(frag);
+      // ---------- Close a tab ----------
+      function resetViewer() {
+        activeTabId = null
+        activeEntry = null
+        if (activeFileRecord) {
+          setRowActive(activeFileRecord, false)
+          activeFileRecord = null
         }
-
-        // ---------- List layout: flat, sorted by full path ----------
-        function renderListView() {
-            const frag = document.createDocumentFragment();
-            const sorted = [...fileRecords].sort((a, b) => a.id.localeCompare(b.id));
-            for (const record of sorted) {
-                const item = createFileRow(record, 'list');
-                record.elList = item;
-                frag.appendChild(item);
-            }
-            listView.appendChild(frag);
+        viewer.src = "about:blank"
+        viewer.classList.add("hidden")
+        codeEditorEl.classList.add("hidden")
+        if (monacoEditor) {
+          const m = monacoEditor.getModel()
+          monacoEditor.setModel(null)
+          if (m) m.dispose()
         }
+        placeholder.style.display = "flex"
+        viewerToolbar.classList.add("hidden")
+        viewerToolbar.classList.remove("flex")
+        viewToggle.classList.add("hidden")
+        viewToggle.classList.remove("flex")
+        btnFullscreen.disabled = true
+        btnReload.disabled = true
+        btnOpenTab.disabled = true
+        fileInfo.classList.add("hidden")
+        fileInfo.classList.remove("md:inline-flex")
+        fileInfo.textContent = ""
+        breadcrumb.innerHTML = '<ul><li class="text-base-content/40">No file selected</li></ul>'
+      }
 
-        // ---------- Layout (Tree/List) toggle ----------
-        function applyLayout(mode) {
-            layoutMode = mode;
-            const hasFiles = fileRecords.length > 0;
+      function closeTab(id) {
+        const idx = tabs.findIndex((t) => t.id === id)
+        if (idx === -1) return
+        const [removed] = tabs.splice(idx, 1)
+        if (removed.blobUrl) URL.revokeObjectURL(removed.blobUrl)
 
-            treeView.classList.toggle('hidden', !(mode === 'tree' && hasFiles));
-            treeView.classList.toggle('flex', mode === 'tree' && hasFiles);
-            listView.classList.toggle('hidden', !(mode === 'list' && hasFiles));
-            listView.classList.toggle('flex', mode === 'list' && hasFiles);
-
-            treeActions.classList.toggle('hidden', mode !== 'tree');
-
-            const activeBtn = 'btn-primary', inactiveBtn = 'btn-ghost';
-            btnLayoutTree.classList.toggle(activeBtn, mode === 'tree');
-            btnLayoutTree.classList.toggle(inactiveBtn, mode !== 'tree');
-            btnLayoutList.classList.toggle(activeBtn, mode === 'list');
-            btnLayoutList.classList.toggle(inactiveBtn, mode !== 'list');
-
-            // Re-apply any active search filter to the newly shown layout
-            performSearch(lastQuery);
-
-            // Keep the active row visible & highlighted in whichever layout is shown
-            if (activeFileRecord) {
-                const el = mode === 'tree' ? activeFileRecord.elTree : activeFileRecord.elList;
-                if (el) el.scrollIntoView({ block: 'nearest' });
-            }
+        if (activeTabId === id) {
+          if (tabs.length) {
+            const next = tabs[Math.min(idx, tabs.length - 1)]
+            activateTab(next.id)
+          } else {
+            resetViewer()
+          }
         }
+        renderTabs()
+      }
 
-        btnLayoutTree.addEventListener('click', () => applyLayout('tree'));
-        btnLayoutList.addEventListener('click', () => applyLayout('list'));
+      function closeAllTabs() {
+        if (!tabs.length) return
+        tabs.forEach((t) => {
+          if (t.blobUrl) URL.revokeObjectURL(t.blobUrl)
+        })
+        tabs = []
+        resetViewer()
+        renderTabs()
+        toast("Closed all tabs")
+      }
 
-        // ---------- Open file -> open or focus a tab ----------
-        async function openFile(record) {
-            const id = record.id;
-            let tab = tabs.find(t => t.id === id);
-            if (!tab) {
-                tab = {
-                    id,
-                    record,
-                    name: record.name,
-                    ext: record.ext,
-                    blobUrl: null,
-                    size: 0
-                };
-                tabs.push(tab);
-                renderTabs();
-            }
-            await activateTab(id);
-        }
+      function closeOtherTabs(keepId) {
+        const keep = tabs.find((t) => t.id === keepId)
+        if (!keep) return
+        tabs.forEach((t) => {
+          if (t.id !== keepId && t.blobUrl) URL.revokeObjectURL(t.blobUrl)
+        })
+        tabs = [keep]
+        if (activeTabId !== keepId) activateTab(keepId)
+        renderTabs()
+        toast("Closed other tabs")
+      }
 
-        // ---------- Highlight a row across both pre-built layouts ----------
-        function setRowActive(record, active) {
-            if (!record) return;
-            [record.elTree, record.elList].forEach((el) => {
-                if (!el) return;
-                if (active) {
-                    el.classList.remove('text-base-content/60');
-                    el.classList.add('row-active', 'text-primary', 'font-semibold');
-                } else {
-                    el.classList.remove('row-active', 'text-primary', 'font-semibold');
-                    el.classList.add('text-base-content/60');
-                }
-            });
-        }
-
-        // ---------- Activate (focus) a tab ----------
-        async function activateTab(id) {
-            const tab = tabs.find(t => t.id === id);
-            if (!tab) return;
-            activeTabId = id;
-            const { record } = tab;
-            const { entry, path } = record;
-
-            // Sidebar highlight (works across tree + list simultaneously)
-            if (activeFileRecord) setRowActive(activeFileRecord, false);
-            setRowActive(record, true);
-            activeFileRecord = record;
-            activeEntry = entry;
-            const currentEl = layoutMode === 'tree' ? record.elTree : record.elList;
-            if (currentEl) currentEl.scrollIntoView({ block: 'nearest' });
-
-            updateBreadcrumb(path);
-            renderTabs();
-
-            loading.classList.remove('hidden');
-            loading.classList.add('flex');
-
-            try {
-                if (!tab.blobUrl) {
-                    const file = await entry.getFile();
-                    const text = await file.text();
-                    tab.size = file.size;
-                    tab.text = text;
-                    const blob = new Blob([text], { type: 'text/html' });
-                    tab.blobUrl = URL.createObjectURL(blob);
-                }
-
-                fileInfo.textContent = `${humanSize(tab.size)} · .${tab.ext}`;
-                fileInfo.classList.remove('hidden');
-                fileInfo.classList.add('md:inline-flex');
-
-                viewer.onload = () => {
-                    if (viewMode === 'preview') { loading.classList.add('hidden'); loading.classList.remove('flex'); }
-                };
-                viewer.src = tab.blobUrl;
-
-                placeholder.style.display = 'none';
-                viewToggle.classList.remove('hidden');
-                viewToggle.classList.add('flex');
-                btnFullscreen.classList.remove('hidden');
-                btnReload.classList.remove('hidden');
-                btnOpenTab.classList.remove('hidden');
-
-                // Render according to current view mode
-                if (viewMode === 'code') {
-                    showCode();
-                } else {
-                    showPreview();
-                }
-            } catch (err) {
-                console.error('[v0] File read error:', err);
-                toast('Failed to read file.', 'error');
-                loading.classList.add('hidden');
-                loading.classList.remove('flex');
-            }
-        }
-
-        // ---------- Close a tab ----------
-        function resetViewer() {
-            activeTabId = null;
-            activeEntry = null;
-            if (activeFileRecord) {
-                setRowActive(activeFileRecord, false);
-                activeFileRecord = null;
-            }
-            viewer.src = 'about:blank';
-            viewer.classList.add('hidden');
-            codeEditorEl.classList.add('hidden');
-            if (monacoEditor) { const m = monacoEditor.getModel(); monacoEditor.setModel(null); if (m) m.dispose(); }
-            placeholder.style.display = 'flex';
-            viewerToolbar.classList.add('hidden');
-            viewerToolbar.classList.remove('flex');
-            viewToggle.classList.add('hidden');
-            viewToggle.classList.remove('flex');
-            btnFullscreen.classList.add('hidden');
-            btnReload.classList.add('hidden');
-            btnOpenTab.classList.add('hidden');
-            fileInfo.classList.add('hidden');
-            fileInfo.classList.remove('md:inline-flex');
-            fileInfo.textContent = '';
-            breadcrumb.innerHTML = '<ul><li class="text-base-content/40">No file selected</li></ul>';
-        }
-
-        function closeTab(id) {
-            const idx = tabs.findIndex(t => t.id === id);
-            if (idx === -1) return;
-            const [removed] = tabs.splice(idx, 1);
-            if (removed.blobUrl) URL.revokeObjectURL(removed.blobUrl);
-
-            if (activeTabId === id) {
-                if (tabs.length) {
-                    const next = tabs[Math.min(idx, tabs.length - 1)];
-                    activateTab(next.id);
-                } else {
-                    resetViewer();
-                }
-            }
-            renderTabs();
-        }
-
-        function closeAllTabs() {
-            if (!tabs.length) return;
-            tabs.forEach(t => { if (t.blobUrl) URL.revokeObjectURL(t.blobUrl); });
-            tabs = [];
-            resetViewer();
-            renderTabs();
-            toast('Closed all tabs');
-        }
-
-        function closeOtherTabs(keepId) {
-            const keep = tabs.find(t => t.id === keepId);
-            if (!keep) return;
-            tabs.forEach(t => { if (t.id !== keepId && t.blobUrl) URL.revokeObjectURL(t.blobUrl); });
-            tabs = [keep];
-            if (activeTabId !== keepId) activateTab(keepId);
-            renderTabs();
-            toast('Closed other tabs');
-        }
-
-        // ---------- Tab context menu ----------
-        function showTabMenu(x, y, tabId) {
-            closeTabMenu();
-            const menu = document.createElement('ul');
-            menu.id = 'tab-context-menu';
-            menu.className = 'menu menu-sm bg-base-300 rounded-box border border-base-content/15 shadow-xl fixed z-50 p-1 w-44';
-            menu.style.left = x + 'px';
-            menu.style.top = y + 'px';
-            menu.innerHTML = `
+      // ---------- Tab context menu ----------
+      function showTabMenu(x, y, tabId) {
+        closeTabMenu()
+        const menu = document.createElement("ul")
+        menu.id = "tab-context-menu"
+        menu.className = "menu menu-sm bg-base-300 rounded-box border border-base-content/15 shadow-xl fixed z-50 p-1 w-44"
+        menu.style.left = x + "px"
+        menu.style.top = y + "px"
+        menu.innerHTML = `
                 <li><a data-act="close">Close</a></li>
                 <li><a data-act="others">Close others</a></li>
-                <li><a data-act="all">Close all</a></li>`;
-            menu.addEventListener('click', (e) => {
-                const act = e.target.getAttribute('data-act');
-                if (act === 'close') closeTab(tabId);
-                else if (act === 'others') closeOtherTabs(tabId);
-                else if (act === 'all') closeAllTabs();
-                closeTabMenu();
-            });
-            document.body.appendChild(menu);
-            const r = menu.getBoundingClientRect();
-            if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
-            if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
-        }
-        function closeTabMenu() {
-            const m = document.getElementById('tab-context-menu');
-            if (m) m.remove();
-        }
-        document.addEventListener('click', closeTabMenu);
-        document.addEventListener('scroll', closeTabMenu, true);
+                <li><a data-act="all">Close all</a></li>`
+        menu.addEventListener("click", (e) => {
+          const act = e.target.getAttribute("data-act")
+          if (act === "close") closeTab(tabId)
+          else if (act === "others") closeOtherTabs(tabId)
+          else if (act === "all") closeAllTabs()
+          closeTabMenu()
+        })
+        document.body.appendChild(menu)
+        const r = menu.getBoundingClientRect()
+        if (r.right > window.innerWidth) menu.style.left = window.innerWidth - r.width - 8 + "px"
+        if (r.bottom > window.innerHeight) menu.style.top = window.innerHeight - r.height - 8 + "px"
+      }
+      function closeTabMenu() {
+        const m = document.getElementById("tab-context-menu")
+        if (m) m.remove()
+      }
+      document.addEventListener("click", closeTabMenu)
+      document.addEventListener("scroll", closeTabMenu, true)
 
-        // ---------- Render the tab bar ----------
-        function renderTabs() {
-            if (!tabs.length) {
-                tabBar.classList.add('hidden');
-                tabBar.classList.remove('flex');
-                tabBar.innerHTML = '';
-                return;
+      // ---------- Render the tab bar ----------
+      function renderTabs() {
+        if (!tabs.length) {
+          tabBar.classList.add("hidden")
+          tabBar.classList.remove("flex")
+          tabBar.innerHTML = ""
+          return
+        }
+        tabBar.classList.remove("hidden")
+        tabBar.classList.add("flex")
+
+        const frag = document.createDocumentFragment()
+
+        tabs.forEach((tab) => {
+          const isActive = tab.id === activeTabId
+          const el = document.createElement("div")
+          el.className =
+            "tab-item group relative flex items-center gap-1.5 pl-3 pr-1.5 h-full border-r border-base-content/10 cursor-pointer text-xs whitespace-nowrap shrink-0 transition-colors " +
+            (isActive ? "bg-base-100 text-base-content" : "bg-transparent text-base-content/50 hover:bg-base-content/5 hover:text-base-content/80")
+          el.title = tab.record.path.join(" / ")
+
+          if (isActive) {
+            const bar = document.createElement("span")
+            bar.className = "absolute top-0 left-0 right-0 h-0.5 bg-primary"
+            el.appendChild(bar)
+          }
+
+          const icon = document.createElement("span")
+          icon.innerHTML = fileIconSvg(tab.ext)
+          el.appendChild(icon)
+
+          const label = document.createElement("span")
+          label.textContent = tab.name
+          label.className = "max-w-[160px] truncate"
+          el.appendChild(label)
+
+          const close = document.createElement("button")
+          close.className =
+            "btn btn-ghost btn-xs btn-square h-5 w-5 min-h-0 ml-0.5 opacity-0 group-hover:opacity-100 " + (isActive ? "opacity-60" : "")
+          close.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>'
+          close.title = "Close"
+          close.addEventListener("click", (e) => {
+            e.stopPropagation()
+            closeTab(tab.id)
+          })
+          el.appendChild(close)
+
+          el.addEventListener("click", () => activateTab(tab.id))
+          el.addEventListener("mousedown", (e) => {
+            if (e.button === 1) {
+              e.preventDefault()
+              closeTab(tab.id)
             }
-            tabBar.classList.remove('hidden');
-            tabBar.classList.add('flex');
+          })
+          el.addEventListener("contextmenu", (e) => {
+            e.preventDefault()
+            showTabMenu(e.clientX, e.clientY, tab.id)
+          })
 
-            const frag = document.createDocumentFragment();
+          frag.appendChild(el)
+        })
 
-            tabs.forEach(tab => {
-                const isActive = tab.id === activeTabId;
-                const el = document.createElement('div');
-                el.className = 'tab-item group relative flex items-center gap-1.5 pl-3 pr-1.5 h-full border-r border-base-content/10 cursor-pointer text-xs whitespace-nowrap shrink-0 transition-colors '
-                    + (isActive
-                        ? 'bg-base-100 text-base-content'
-                        : 'bg-transparent text-base-content/50 hover:bg-base-content/5 hover:text-base-content/80');
-                el.title = tab.record.path.join(' / ');
-
-                if (isActive) {
-                    const bar = document.createElement('span');
-                    bar.className = 'absolute top-0 left-0 right-0 h-0.5 bg-primary';
-                    el.appendChild(bar);
-                }
-
-                const icon = document.createElement('span');
-                icon.innerHTML = fileIconSvg(tab.ext);
-                el.appendChild(icon);
-
-                const label = document.createElement('span');
-                label.textContent = tab.name;
-                label.className = 'max-w-[160px] truncate';
-                el.appendChild(label);
-
-                const close = document.createElement('button');
-                close.className = 'btn btn-ghost btn-xs btn-square h-5 w-5 min-h-0 ml-0.5 opacity-0 group-hover:opacity-100 '
-                    + (isActive ? 'opacity-60' : '');
-                close.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>';
-                close.title = 'Close';
-                close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tab.id); });
-                el.appendChild(close);
-
-                el.addEventListener('click', () => activateTab(tab.id));
-                el.addEventListener('mousedown', (e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id); } });
-                el.addEventListener('contextmenu', (e) => { e.preventDefault(); showTabMenu(e.clientX, e.clientY, tab.id); });
-
-                frag.appendChild(el);
-            });
-
-            // Trailing actions: close other / close all
-            const actions = document.createElement('div');
-            actions.className = 'flex items-center gap-0.5 px-1.5 ml-auto sticky right-0 bg-base-200/50 border-l border-base-content/10 shrink-0';
-            actions.innerHTML = `
+        // Trailing actions: close other / close all
+        const actions = document.createElement("div")
+        actions.className = "flex items-center gap-0.5 px-1.5 ml-auto sticky right-0 bg-base-200/50 border-l border-base-content/10 shrink-0"
+        actions.innerHTML = `
                 <div class="tooltip tooltip-left" data-tip="Close other tabs">
-                    <button id="btn-close-others" class="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0" ${tabs.length < 2 ? 'disabled' : ''}>
+                    <button id="btn-close-others" class="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0" ${tabs.length < 2 ? "disabled" : ""}>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9h9.75A2.25 2.25 0 0 1 21 11.25v7.5A2.25 2.25 0 0 1 18.75 21h-7.5A2.25 2.25 0 0 1 9 18.75V9Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5v2.25" /></svg>
                     </button>
                 </div>
@@ -1071,205 +1318,232 @@
                     <button id="btn-close-all" class="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 hover:text-error">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
                     </button>
-                </div>`;
-            frag.appendChild(actions);
+                </div>`
+        frag.appendChild(actions)
 
-            tabBar.innerHTML = '';
-            tabBar.appendChild(frag);
-            tabBar.querySelector('#btn-close-others').addEventListener('click', () => closeOtherTabs(activeTabId));
-            tabBar.querySelector('#btn-close-all').addEventListener('click', closeAllTabs);
+        tabBar.innerHTML = ""
+        tabBar.appendChild(frag)
+        tabBar.querySelector("#btn-close-others").addEventListener("click", () => closeOtherTabs(activeTabId))
+        tabBar.querySelector("#btn-close-all").addEventListener("click", closeAllTabs)
 
-            const active = tabBar.querySelector('.tab-item.bg-base-100');
-            if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        const active = tabBar.querySelector(".tab-item.bg-base-100")
+        if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" })
+      }
+
+      function updateBreadcrumb(path) {
+        breadcrumb.innerHTML =
+          "<ul>" +
+          path
+            .map((p, i) => `<li class="${i === path.length - 1 ? "text-primary font-semibold" : "text-base-content/50"}">${escapeHtml(p)}</li>`)
+            .join("") +
+          "</ul>"
+      }
+
+      // ---------- Reload / open in new tab ----------
+      btnReload.addEventListener("click", () => {
+        const tab = tabs.find((t) => t.id === activeTabId)
+        if (tab) {
+          if (tab.blobUrl) {
+            URL.revokeObjectURL(tab.blobUrl)
+            tab.blobUrl = null
+          }
+          tab.text = null
+          activateTab(tab.id)
+          toast("Reloaded")
+        }
+      })
+      btnOpenTab.addEventListener("click", () => {
+        const tab = tabs.find((t) => t.id === activeTabId)
+        if (tab && tab.blobUrl) window.open(tab.blobUrl, "_blank")
+      })
+
+      // ---------- Search ----------
+      // Fully in-memory: no DOM querySelector calls. Uses pre-built
+      // folderChildren index to propagate visibility up the tree in O(files)
+      // instead of O(folders × DOM queries).
+      function performSearch(query) {
+        lastQuery = query
+        if (!fileRecords.length) {
+          noResultsState.classList.add("hidden")
+          return
         }
 
-        function updateBreadcrumb(path) {
-            breadcrumb.innerHTML = '<ul>' + path.map((p, i) =>
-                `<li class="${i === path.length - 1 ? 'text-primary font-semibold' : 'text-base-content/50'}">${escapeHtml(p)}</li>`
-            ).join('') + '</ul>';
+        let anyVisible = false
+
+        if (layoutMode === "tree") {
+          const folderVisible = new Map()
+
+          for (const r of fileRecords) {
+            r._searchVisible = !query || r.name.toLowerCase().includes(query)
+            if (r.elTree) r.elTree.style.display = r._searchVisible ? "" : "none"
+            if (r._searchVisible) anyVisible = true
+          }
+
+          for (let i = folderRecords.length - 1; i >= 0; i--) {
+            const f = folderRecords[i]
+            const folderKey = f.path.join("/")
+            const nameMatch = !query || f.path[f.path.length - 1].toLowerCase().includes(query)
+
+            const children = folderChildren.get(folderKey)
+            let hasVisibleDescendant = false
+            if (children) {
+              hasVisibleDescendant =
+                children.files.some((r) => r._searchVisible) || children.folders.some((sub) => folderVisible.get(sub.path.join("/")))
+            }
+
+            const visible = !query || nameMatch || hasVisibleDescendant
+            folderVisible.set(folderKey, visible)
+            f.el.style.display = visible ? "" : "none"
+            if (visible && query) f.el.classList.remove("collapsed")
+            if (visible) anyVisible = true
+          }
+        } else {
+          for (const r of fileRecords) {
+            const match = !query || r.name.toLowerCase().includes(query) || r.id.toLowerCase().includes(query)
+            r._searchVisible = match
+            if (r.elList) r.elList.style.display = match ? "" : "none"
+            if (match) anyVisible = true
+          }
         }
 
-        // ---------- Reload / open in new tab ----------
-        btnReload.addEventListener('click', () => {
-            const tab = tabs.find(t => t.id === activeTabId);
-            if (tab) {
-                if (tab.blobUrl) { URL.revokeObjectURL(tab.blobUrl); tab.blobUrl = null; }
-                tab.text = null;
-                activateTab(tab.id);
-                toast('Reloaded');
-            }
-        });
-        btnOpenTab.addEventListener('click', () => {
-            const tab = tabs.find(t => t.id === activeTabId);
-            if (tab && tab.blobUrl) window.open(tab.blobUrl, '_blank');
-        });
+        noResultsState.classList.toggle("hidden", anyVisible || !query)
+      }
 
-        // ---------- Search ----------
-        // Fully in-memory: no DOM querySelector calls. Uses pre-built
-        // folderChildren index to propagate visibility up the tree in O(files)
-        // instead of O(folders × DOM queries).
-        function performSearch(query) {
-            lastQuery = query;
-            if (!fileRecords.length) { noResultsState.classList.add('hidden'); return; }
+      // Debounce: avoids expensive re-filtering on every keystroke for large trees
+      let searchDebounceTimer = null
+      searchInput.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim()
+        clearTimeout(searchDebounceTimer)
+        searchDebounceTimer = setTimeout(() => performSearch(query), 80)
+      })
 
-            let anyVisible = false;
+      btnExpandAll.addEventListener("click", () => {
+        folderRecords.forEach((f) => f.el.classList.remove("collapsed"))
+      })
+      btnCollapseAll.addEventListener("click", () => {
+        folderRecords.forEach((f) => f.el.classList.add("collapsed"))
+      })
 
-            if (layoutMode === 'tree') {
-                const folderVisible = new Map();
+      // ---------- Fullscreen ----------
+      btnFullscreen.addEventListener("click", toggleFullscreen)
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          viewerContainer.requestFullscreen().catch((err) => console.error("[v0]", err))
+        } else {
+          document.exitFullscreen()
+        }
+      }
 
-                for (const r of fileRecords) {
-                    r._searchVisible = !query || r.name.toLowerCase().includes(query);
-                    if (r.elTree) r.elTree.style.display = r._searchVisible ? '' : 'none';
-                    if (r._searchVisible) anyVisible = true;
-                }
+      // ---------- Zoom ----------
+      function applyZoom() {
+        viewer.style.transform = `scale(${zoom})`
+        viewer.style.width = `${100 / zoom}%`
+        viewer.style.height = `${100 / zoom}%`
+        zoomLabel.textContent = Math.round(zoom * 100) + "%"
+      }
+      btnZoomIn.addEventListener("click", () => {
+        zoom = Math.min(2, zoom + 0.1)
+        applyZoom()
+      })
+      btnZoomOut.addEventListener("click", () => {
+        zoom = Math.max(0.4, zoom - 0.1)
+        applyZoom()
+      })
+      btnZoomReset.addEventListener("click", () => {
+        zoom = 1
+        applyZoom()
+      })
 
-                for (let i = folderRecords.length - 1; i >= 0; i--) {
-                    const f = folderRecords[i];
-                    const folderKey = f.path.join('/');
-                    const nameMatch = !query || f.path[f.path.length - 1].toLowerCase().includes(query);
+      // ---------- Sidebar resizer ----------
+      // requestAnimationFrame-throttled: mousemove can fire far more often than the
+      // display refreshes, so without throttling every event forces a synchronous
+      // style write + reflow. Coalescing to one width update per frame keeps
+      // dragging smooth even on lower-end hardware.
+      let isResizing = false
+      let pendingWidth = null
+      let resizeRaf = null
+      resizer.addEventListener("mousedown", () => {
+        isResizing = true
+        document.body.classList.add("resizing")
+      })
+      document.addEventListener(
+        "mousemove",
+        (e) => {
+          if (!isResizing) return
+          pendingWidth = e.clientX
+          if (resizeRaf) return
+          resizeRaf = requestAnimationFrame(() => {
+            resizeRaf = null
+            if (pendingWidth >= 240 && pendingWidth <= 520) sidebar.style.width = `${pendingWidth}px`
+          })
+        },
+        { passive: true },
+      )
+      document.addEventListener("mouseup", () => {
+        isResizing = false
+        document.body.classList.remove("resizing")
+      })
 
-                    const children = folderChildren.get(folderKey);
-                    let hasVisibleDescendant = false;
-                    if (children) {
-                        hasVisibleDescendant = children.files.some(r => r._searchVisible) ||
-                            children.folders.some(sub => folderVisible.get(sub.path.join('/')));
-                    }
+      // ---------- Keyboard navigation ----------
+      function visibleFiles() {
+        // Uses _searchVisible flag (set during performSearch) instead of
+        // offsetParent which forces synchronous layout recalculation.
+        return fileRecords.filter((r) => {
+          const el = layoutMode === "tree" ? r.elTree : r.elList
+          if (!el) return false
+          if (lastQuery && !r._searchVisible) return false
+          return el.offsetParent !== null
+        })
+      }
+      document.addEventListener("keydown", (e) => {
+        const typing = document.activeElement === searchInput
 
-                    const visible = !query || nameMatch || hasVisibleDescendant;
-                    folderVisible.set(folderKey, visible);
-                    f.el.style.display = visible ? '' : 'none';
-                    if (visible && query) f.el.classList.remove('collapsed');
-                    if (visible) anyVisible = true;
-                }
-            } else {
-                for (const r of fileRecords) {
-                    const match = !query || r.name.toLowerCase().includes(query) || r.id.toLowerCase().includes(query);
-                    r._searchVisible = match;
-                    if (r.elList) r.elList.style.display = match ? '' : 'none';
-                    if (match) anyVisible = true;
-                }
-            }
-
-            noResultsState.classList.toggle('hidden', anyVisible || !query);
+        // Close active tab (Ctrl/Cmd+W)
+        if ((e.ctrlKey || e.metaKey) && (e.key === "w" || e.key === "W")) {
+          if (activeTabId) {
+            e.preventDefault()
+            closeTab(activeTabId)
+          }
+          return
+        }
+        // Cycle tabs (Ctrl/Cmd+Tab)
+        if (e.ctrlKey && e.key === "Tab" && tabs.length > 1) {
+          e.preventDefault()
+          const i = tabs.findIndex((t) => t.id === activeTabId)
+          const next = e.shiftKey ? (i - 1 + tabs.length) % tabs.length : (i + 1) % tabs.length
+          activateTab(tabs[next].id)
+          return
         }
 
-        // Debounce: avoids expensive re-filtering on every keystroke for large trees
-        let searchDebounceTimer = null;
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            clearTimeout(searchDebounceTimer);
-            searchDebounceTimer = setTimeout(() => performSearch(query), 80);
-        });
-
-        btnExpandAll.addEventListener('click', () => {
-            folderRecords.forEach(f => f.el.classList.remove('collapsed'));
-        });
-        btnCollapseAll.addEventListener('click', () => {
-            folderRecords.forEach(f => f.el.classList.add('collapsed'));
-        });
-
-        // ---------- Fullscreen ----------
-        btnFullscreen.addEventListener('click', toggleFullscreen);
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                viewerContainer.requestFullscreen().catch(err => console.error('[v0]', err));
-            } else {
-                document.exitFullscreen();
-            }
+        if (e.key === "/" && !typing) {
+          e.preventDefault()
+          searchInput.focus()
+          return
         }
-
-        // ---------- Zoom ----------
-        function applyZoom() {
-            viewer.style.transform = `scale(${zoom})`;
-            viewer.style.width = `${100 / zoom}%`;
-            viewer.style.height = `${100 / zoom}%`;
-            zoomLabel.textContent = Math.round(zoom * 100) + '%';
+        if (e.key === "Escape" && typing) {
+          searchInput.blur()
+          return
         }
-        btnZoomIn.addEventListener('click', () => { zoom = Math.min(2, zoom + 0.1); applyZoom(); });
-        btnZoomOut.addEventListener('click', () => { zoom = Math.max(0.4, zoom - 0.1); applyZoom(); });
-        btnZoomReset.addEventListener('click', () => { zoom = 1; applyZoom(); });
-
-        // ---------- Sidebar resizer ----------
-        // requestAnimationFrame-throttled: mousemove can fire far more often than the
-        // display refreshes, so without throttling every event forces a synchronous
-        // style write + reflow. Coalescing to one width update per frame keeps
-        // dragging smooth even on lower-end hardware.
-        let isResizing = false;
-        let pendingWidth = null;
-        let resizeRaf = null;
-        resizer.addEventListener('mousedown', () => {
-            isResizing = true;
-            document.body.classList.add('resizing');
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            pendingWidth = e.clientX;
-            if (resizeRaf) return;
-            resizeRaf = requestAnimationFrame(() => {
-                resizeRaf = null;
-                if (pendingWidth >= 240 && pendingWidth <= 520) sidebar.style.width = `${pendingWidth}px`;
-            });
-        }, { passive: true });
-        document.addEventListener('mouseup', () => {
-            isResizing = false;
-            document.body.classList.remove('resizing');
-        });
-
-        // ---------- Keyboard navigation ----------
-        function visibleFiles() {
-            // Uses _searchVisible flag (set during performSearch) instead of
-            // offsetParent which forces synchronous layout recalculation.
-            return fileRecords.filter(r => {
-                const el = layoutMode === 'tree' ? r.elTree : r.elList;
-                if (!el) return false;
-                if (lastQuery && !r._searchVisible) return false;
-                return el.offsetParent !== null;
-            });
+        if ((e.key === "f" || e.key === "F") && !typing && activeEntry) {
+          e.preventDefault()
+          toggleFullscreen()
+          return
         }
-        document.addEventListener('keydown', (e) => {
-            const typing = document.activeElement === searchInput;
+        if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !typing) {
+          const list = visibleFiles()
+          if (!list.length) return
+          e.preventDefault()
+          let idx = list.findIndex((r) => r === activeFileRecord)
+          idx = e.key === "ArrowDown" ? Math.min(list.length - 1, idx + 1) : Math.max(0, idx - 1)
+          if (idx < 0) idx = 0
+          openFile(list[idx])
+        }
+      })
 
-            // Close active tab (Ctrl/Cmd+W)
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
-                if (activeTabId) { e.preventDefault(); closeTab(activeTabId); }
-                return;
-            }
-            // Cycle tabs (Ctrl/Cmd+Tab)
-            if (e.ctrlKey && e.key === 'Tab' && tabs.length > 1) {
-                e.preventDefault();
-                const i = tabs.findIndex(t => t.id === activeTabId);
-                const next = e.shiftKey ? (i - 1 + tabs.length) % tabs.length : (i + 1) % tabs.length;
-                activateTab(tabs[next].id);
-                return;
-            }
-
-            if (e.key === '/' && !typing) {
-                e.preventDefault();
-                searchInput.focus();
-                return;
-            }
-            if (e.key === 'Escape' && typing) {
-                searchInput.blur();
-                return;
-            }
-            if ((e.key === 'f' || e.key === 'F') && !typing && activeEntry) {
-                e.preventDefault();
-                toggleFullscreen();
-                return;
-            }
-            if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !typing) {
-                const list = visibleFiles();
-                if (!list.length) return;
-                e.preventDefault();
-                let idx = list.findIndex(r => r === activeFileRecord);
-                idx = e.key === 'ArrowDown' ? Math.min(list.length - 1, idx + 1) : Math.max(0, idx - 1);
-                if (idx < 0) idx = 0;
-                openFile(list[idx]);
-            }
-        });
-
-        // ---------- Drag & drop hint ----------
-        viewerContainer.addEventListener('dragover', (e) => { e.preventDefault(); });
+      // ---------- Drag & drop hint ----------
+      viewerContainer.addEventListener("dragover", (e) => {
+        e.preventDefault()
+      })
     </script>
-</body>
+  </body>
 </html>
